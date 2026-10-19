@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:17
+    env_file: .env
+    ports:
+      - "5433:5432"          # desde tu máquina: localhost:5433 (no choca con un Postgres local)
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  web:
+    build: .
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db      # dentro de Docker la base se llama "db"
+      POSTGRES_PORT: 5432
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/code              # los cambios en el código se ven al instante
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && fastapi dev app/main.py --host 0.0.0.0 --port 8000"
+
+volumes:
+  pgdata:
