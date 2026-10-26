@@ -415,6 +415,16 @@ Sin un admin nadie puede dar de alta usuarios. La contraseña se pide por teclad
 docker compose exec web python -m app.scripts.crear_admin --dni 12345678
 ```
 
+### Cargar datos de prueba
+
+Herramienta de desarrollo: carga un preceptor, 2 carreras, 4 materias, 2 docentes, 6 alumnos, 5 cátedras e inscripciones (una con `vigente=false`). Todos con contraseña `prueba123`; al terminar imprime la tabla de usuarios.
+
+```bash
+docker compose exec web python -m app.scripts.cargar_datos_prueba
+```
+
+Se puede correr varias veces: lo que ya existe (por DNI, nombre, materia + comisión, etc.) se saltea sin modificarlo. No crea avisos. Los datos quedan en la base de desarrollo; para borrarlos, empezar de cero con `docker compose down -v`.
+
 ### Probar HU-02 en `/docs`
 
 1. Con el admin logueado (**Authorize**): crear una carrera, una materia, un docente (`POST /docentes`) y una cátedra de ese docente (`POST /catedras`) con un `dia_semana` de los próximos días.
