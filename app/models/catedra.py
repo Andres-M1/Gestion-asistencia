@@ -1,7 +1,7 @@
 from datetime import time
 from typing import TYPE_CHECKING
 
-from sqlmodel import CheckConstraint, Field, Relationship, SQLModel
+from sqlmodel import CheckConstraint, Field, Relationship, SQLModel, UniqueConstraint
 
 if TYPE_CHECKING:
     from app.models.ausencia import Ausencia
@@ -14,11 +14,13 @@ class Catedra(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint("dia_semana BETWEEN 1 AND 7", name="ck_catedra_dia_semana"),  # 1 = lunes ... 7 = domingo
         CheckConstraint("hora_fin > hora_inicio", name="ck_catedra_horario"),
+        UniqueConstraint("materia_id", "comision", name="uq_catedra_materia_comision"),
     )
 
     id: int | None = Field(default=None, primary_key=True)
     materia_id: int = Field(foreign_key="materia.id")
     docente_id: int = Field(foreign_key="docente.id")
+    comision: str  # ej. "1K1"
     dia_semana: int
     hora_inicio: time
     hora_fin: time

@@ -16,6 +16,14 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "gestion_asist"
 
+    SECRET_KEY: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    CORS_ORIGINS: str = ""
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
     @property
     def DATABASE_URL(self) -> str:
         return (

@@ -14,6 +14,7 @@ class Inscripcion(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     alumno_id: int = Field(foreign_key="alumno.id")
     catedra_id: int = Field(foreign_key="catedra.id")
+    vigente: bool = True
 
     alumno: "Alumno" = Relationship(back_populates="inscripciones")
     catedra: "Catedra" = Relationship(back_populates="inscripciones")
