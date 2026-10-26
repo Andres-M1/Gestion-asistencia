@@ -21,6 +21,7 @@ class Usuario(SQLModel, table=True):
     password_hash: str
     rol: Rol
     activo: bool = True
+    email: str | None = None  # para notificar al preceptor (admin); docentes y alumnos usan el de su perfil
 
     # Relación 1 a 1: un usuario tiene como mucho un perfil (el admin no tiene ninguno)
     docente: Optional["Docente"] = Relationship(back_populates="usuario", sa_relationship_kwargs={"uselist": False})

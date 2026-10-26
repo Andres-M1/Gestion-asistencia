@@ -20,7 +20,6 @@ class Ausencia(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     catedra_id: int = Field(foreign_key="catedra.id")
     fecha: date
-    motivo: str
     estado: EstadoAusencia = EstadoAusencia.activo
     creado_en: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime(timezone=True)

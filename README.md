@@ -1,6 +1,6 @@
 # Gestion Asist
 
-Sistema web para gestionar la **asistencia en una institución educativa**: carreras, materias, docentes, cátedras (una materia dictada por un docente en un día y horario), inscripciones de alumnos y ausencias de docentes.
+API de **avisos de ausencia docente**: el docente avisa que no va a dar una clase concreta y los alumnos inscriptos en esa cátedra se enteran. Este repo es **solo la API**; la app Android (docentes y alumnos) y el frontend web (administrador / preceptor) son proyectos aparte.
 
 Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre entero en **Docker**, así que funciona igual en cualquier máquina.
 
@@ -28,8 +28,22 @@ Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre e
 
 ## Estado del proyecto
 
-| Parte                       | Estado                                                                                |
-|-----------------------------|---------------------------------------------------------------------------------------|
+| HU     | Rol        | Qué                                                        | Estado |
+|--------|------------|------------------------------------------------------------|--------|
+| HU-01  | Todos      | Login con DNI y contraseña                                 | ✅ `/auth/login`, `/auth/me` |
+| HU-02  | Docente    | Registrar aviso eligiendo una clase concreta de una lista  | ✅ `/docente/clases-disponibles`, `/docente/avisos` |
+| HU-03  | Docente    | Ver el historial de sus avisos                             | ⏳ |
+| ~~HU-04~~ | —       | Cancelar aviso: **descartada** (un aviso no se cancela ni se edita) | ❌ |
+| HU-05  | Estudiante | Ver avisos de cátedras donde tiene inscripción vigente     | ⏳ |
+| HU-06  | Estudiante / Preceptor | Notificación push + correo al registrarse un aviso | ⏳ |
+| HU-07  | Estudiante | Ver sus inscripciones vigentes y sus avisos                | ⏳ |
+| HU-08  | Admin      | Alta de docentes y estudiantes                             | ✅ `/docentes`, `/alumnos` |
+| HU-09  | Admin      | Listar avisos con filtros                                  | ⏳ |
+| HU-10  | Admin      | Asignar docentes a materias (cátedras)                     | ✅ `/catedras` |
+
+Además: CRUD de administrador para carreras, materias e inscripciones (necesarios para cargar los datos).
+
+-----------------------------|---------------------------------------------------------------------------------------|
 | Modelos / tablas            | ✅ Todos creados: Carrera, Materia, Alumno, Docente, Cátedra, Inscripción, Ausencia    |
 | Migración inicial           | ✅ `alembic/versions/cd7107349f41_tablas_iniciales.py`                                 |
 | API de Carreras             | ✅ CRUD completo                                                                       |
@@ -68,6 +82,9 @@ psycopg[binary]==3.3.6       # Driver de PostgreSQL (versión precompilada, no r
 alembic==1.20.0              # Migraciones
 pydantic-settings==2.16.0    # Configuración desde .env
 pytest==9.1.1                # Tests
+pwdlib[argon2]==0.3.1        # Encriptado de contraseñas (Argon2)
+pyjwt==2.15.1                # Tokens de acceso (JWT)
+tzdata==2026.5               # Zonas horarias para zoneinfo (también en Windows)
 ```
 
 No hace falta instalarlas a mano para correr la app: **Docker las instala solo** al construir la imagen. Solo las instalás en tu máquina (dentro de un entorno virtual) para que el editor autocomplete y para correr `alembic` y `pytest` desde la terminal (ver [paso 5](#paso-5-entorno-virtual-local-recomendado)).
@@ -261,6 +278,8 @@ Hay **una sola base de datos**: la del contenedor `db`. Pero se llega a ella por
 
 ```mermaid
 erDiagram
+    USUARIO ||--o| DOCENTE : "es"
+    USUARIO ||--o| ALUMNO : "es"
     CARRERA ||--o{ MATERIA : "tiene"
     CARRERA ||--o{ ALUMNO : "tiene"
     MATERIA ||--o{ CATEDRA : "se dicta en"
@@ -269,6 +288,14 @@ erDiagram
     CATEDRA ||--o{ INSCRIPCION : "recibe"
     CATEDRA ||--o{ AUSENCIA : "registra"
 
+    USUARIO {
+        int id PK
+        string dni UK
+        string password_hash
+        enum rol "admin | docente | estudiante"
+        bool activo
+        string email "opcional, para el preceptor"
+    }
     CARRERA {
         int id PK
         string nombre UK
@@ -280,15 +307,15 @@ erDiagram
     }
     ALUMNO {
         int id PK
+        int usuario_id FK,UK
         int carrera_id FK
-        string dni UK
         string nombre
         string apellido
         string email UK
     }
     DOCENTE {
         int id PK
-        string dni UK
+        int usuario_id FK,UK
         string nombre
         string apellido
         string email UK
@@ -297,6 +324,7 @@ erDiagram
         int id PK
         int materia_id FK
         int docente_id FK
+        string comision
         int dia_semana
         time hora_inicio
         time hora_fin
@@ -305,24 +333,29 @@ erDiagram
         int id PK
         int alumno_id FK
         int catedra_id FK
+        bool vigente
     }
     AUSENCIA {
         int id PK
         int catedra_id FK
         date fecha
-        string motivo
+        enum estado "activo"
+        datetime creado_en
     }
 ```
 
 | Tabla           | Qué representa                                                             | Reglas que impone la base                                       |
 |-----------------|----------------------------------------------------------------------------|-----------------------------------------------------------------|
+| **Usuario**     | Credenciales y rol de quien se loguea. El admin (preceptor) no tiene perfil. | DNI único. La contraseña se guarda encriptada (Argon2).         |
 | **Carrera**     | Una carrera de la institución (ej. "Analista de Sistemas").                | El nombre no se puede repetir.                                  |
 | **Materia**     | Una materia que pertenece a una carrera.                                   | —                                                               |
-| **Alumno**      | Un estudiante, inscripto en una carrera.                                   | DNI y email únicos.                                             |
-| **Docente**     | Un profesor.                                                               | DNI y email únicos.                                             |
-| **Cátedra**     | Una materia dictada por un docente, un día de la semana, en un horario.    | `dia_semana` entre 1 (lunes) y 7 (domingo); `hora_fin` > `hora_inicio`. |
+| **Alumno**      | Perfil de un estudiante, inscripto en una carrera.                         | Un perfil por usuario; email único.                             |
+| **Docente**     | Perfil de un profesor.                                                     | Un perfil por usuario; email único.                             |
+| **Cátedra**     | Una materia dictada por un docente en una comisión, un día y un horario.   | Comisión única por materia; `dia_semana` entre 1 (lunes) y 7 (domingo); `hora_fin` > `hora_inicio`. |
 | **Inscripción** | Un alumno anotado en una cátedra.                                          | Un alumno no puede inscribirse dos veces en la misma cátedra.   |
-| **Ausencia**    | Aviso de que el docente de una cátedra no dará clase en una fecha.         | Una cátedra no puede tener dos ausencias el mismo día. `motivo` es opcional. |
+| **Ausencia**    | Aviso de que el docente no dará una clase (cátedra + fecha).               | Un aviso por cátedra y fecha. No tiene motivo y no se cancela.  |
+
+Una **clase** (ej. "Programación II · 1K1 · martes 03/11 · 18:00-20:00") no es una tabla: se calcula a partir de la cátedra (`dia_semana`, `hora_inicio`, `hora_fin`) y una fecha.
 
 Los modelos están en [app/models/](app/models/), un archivo por tabla.
 
@@ -332,44 +365,62 @@ Los modelos están en [app/models/](app/models/), un archivo por tabla.
 
 Todas las rutas de la API tienen el prefijo `/api/v1`. La forma más cómoda de probarlas es desde **http://localhost:8000/docs**: cada endpoint tiene un botón *Try it out*.
 
-### Salud
+Salvo `/health` y `/auth/login`, **todas las rutas piden un token**. En `/docs`: botón **Authorize** → *username* = DNI, *password* = contraseña.
 
-| Método | Ruta              | Qué hace                                       | Respuestas                    |
-|--------|-------------------|------------------------------------------------|-------------------------------|
-| GET    | `/api/v1/health`  | Verifica que la API y la base respondan.       | `200` ok · `500` si la base no responde |
+### Salud y autenticación
 
-### Carreras
+| Método | Ruta                  | Quién   | Qué hace                                     | Respuestas |
+|--------|-----------------------|---------|----------------------------------------------|------------|
+| GET    | `/api/v1/health`      | Todos   | Verifica que la API y la base respondan.     | `200` |
+| POST   | `/api/v1/auth/login`  | Todos   | Recibe `{dni, password}` y devuelve el token. | `200` · `401` DNI o contraseña incorrectos |
+| GET    | `/api/v1/auth/me`     | Logueado | Datos del usuario, su rol y su perfil.       | `200` · `401` |
 
-| Método | Ruta                         | Qué hace                         | Respuestas                                                        |
-|--------|------------------------------|----------------------------------|-------------------------------------------------------------------|
-| POST   | `/api/v1/carreras/`          | Crea una carrera.                | `201` creada · `409` nombre repetido · `422` datos inválidos      |
-| GET    | `/api/v1/carreras/`          | Lista carreras (paginado).       | `200`                                                             |
-| GET    | `/api/v1/carreras/{id}`      | Obtiene una carrera.             | `200` · `404` no existe                                           |
-| PATCH  | `/api/v1/carreras/{id}`      | Modifica una carrera.            | `200` · `404` no existe · `409` nombre repetido                   |
-| DELETE | `/api/v1/carreras/{id}`      | Borra una carrera.               | `204` borrada · `404` no existe · `409` tiene materias o alumnos  |
+### Docente (HU-02)
 
-El listado acepta `?offset=0&limit=100` para paginar (`limit` máximo: 100).
+| Método | Ruta                                   | Qué hace | Respuestas |
+|--------|----------------------------------------|----------|------------|
+| GET    | `/api/v1/docente/clases-disponibles`   | Próximas clases del docente sobre las que puede avisar. | `200` · `403` no es docente |
+| POST   | `/api/v1/docente/avisos`               | Registra un aviso con `{catedra_id, fecha}`. Queda en estado `activo`. | `201` · `404` cátedra inexistente o ajena · `409` ya hay aviso · `422` no cumple las reglas |
 
-**Ejemplos con `curl`:**
+Una clase aparece en la lista (y el `POST` la acepta) solo si:
+
+- la cátedra es del docente logueado;
+- la fecha cae en el día de cursada de la cátedra;
+- faltan **al menos 1 hora** para su inicio;
+- empieza dentro de los **próximos 7 días**;
+- no tiene ya un aviso.
+
+Todo se calcula en **hora de Argentina** (`America/Argentina/Buenos_Aires`), aunque el contenedor esté en UTC. El `POST` vuelve a validar todo en el servidor: no confía en que el cliente mandó una opción de la lista. La lógica está en [app/services/ausencias.py](app/services/ausencias.py).
+
+### Administrador (HU-08, HU-10)
+
+Todas piden rol `admin`.
+
+| Recurso                  | Rutas                                         | Notas |
+|--------------------------|-----------------------------------------------|-------|
+| `/api/v1/carreras`       | `POST` · `GET` · `GET /{id}` · `PATCH /{id}` · `DELETE /{id}` | |
+| `/api/v1/materias`       | ídem                                           | Filtro `?carrera_id=` |
+| `/api/v1/docentes`       | `POST` · `GET` · `GET /{id}` · `PATCH /{id}`   | Crea usuario + perfil. Sin `DELETE`: se desactiva con `{"activo": false}` |
+| `/api/v1/alumnos`        | ídem                                           | Filtro `?carrera_id=`. Sin `DELETE` |
+| `/api/v1/catedras`       | `POST` · `GET` · `GET /{id}` · `PATCH /{id}` · `DELETE /{id}` | Asigna docente a materia. Filtros `?materia_id=`, `?docente_id=` |
+| `/api/v1/inscripciones`  | ídem                                           | Filtros `?alumno_id=`, `?catedra_id=`, `?vigente=`. Baja con `{"vigente": false}` |
+
+Los listados aceptan `?offset=0&limit=100` (`limit` máximo: 100). Errores comunes: `401` sin token · `403` rol incorrecto · `404` no existe · `409` dato repetido o borrado con registros asociados · `422` datos inválidos.
+
+### Crear el primer administrador
+
+Sin un admin nadie puede dar de alta usuarios. La contraseña se pide por teclado:
 
 ```bash
-# Crear
-curl -X POST http://localhost:8000/api/v1/carreras/ \
-     -H "Content-Type: application/json" \
-     -d '{"nombre": "Analista de Sistemas"}'
-# → {"id":1,"nombre":"Analista de Sistemas"}
-
-# Listar
-curl http://localhost:8000/api/v1/carreras/
-
-# Modificar
-curl -X PATCH http://localhost:8000/api/v1/carreras/1 \
-     -H "Content-Type: application/json" \
-     -d '{"nombre": "Tecnicatura en Programación"}'
-
-# Borrar
-curl -X DELETE http://localhost:8000/api/v1/carreras/1
+docker compose exec web python -m app.scripts.crear_admin --dni 12345678
 ```
+
+### Probar HU-02 en `/docs`
+
+1. Con el admin logueado (**Authorize**): crear una carrera, una materia, un docente (`POST /docentes`) y una cátedra de ese docente (`POST /catedras`) con un `dia_semana` de los próximos días.
+2. **Logout** en Authorize y volver a loguearse con el DNI y la contraseña del docente.
+3. `GET /docente/clases-disponibles` → copiar `catedra_id` y `fecha` de una opción.
+4. `POST /docente/avisos` con esos datos → `201`. Repetirlo → `409`. Volver a listar: esa clase ya no aparece.
 
 ---
 
@@ -394,14 +445,17 @@ Gestion-asistencia/
 │   ├── main.py               # Punto de entrada: crea la app FastAPI y registra rutas
 │   ├── core/                 # Configuración central
 │   │   ├── config.py         # Settings (lee .env) y arma la DATABASE_URL
-│   │   └── database.py       # Engine de la BD y función get_session()
+│   │   ├── database.py       # Engine de la BD y función get_session()
+│   │   └── security.py       # Contraseñas (Argon2) y tokens (JWT)
 │   ├── models/               # Modelos ORM = tablas de la base de datos (uno por archivo)
 │   │   └── __init__.py       # Importar aquí cada modelo para que Alembic lo detecte
 │   ├── schemas/              # Esquemas de entrada/salida de la API (qué recibe y devuelve)
-│   ├── crud/                 # Funciones de acceso a datos (crear, leer, actualizar, borrar)
-│   ├── services/             # Lógica de negocio (reglas que combinan varios CRUD)
+│   ├── crud/                 # Acceso a datos: base.py (CRUD genérico) y usuario.py
+│   ├── services/             # Reglas de negocio (auth, personas, ausencias)
+│   ├── scripts/              # Comandos de consola (crear_admin.py)
 │   ├── api/                  # Capa HTTP
-│   │   ├── deps.py           # Dependencias comunes (ej. SessionDep = sesión de BD)
+│   │   ├── deps.py           # Dependencias comunes: sesión de BD, usuario actual, permisos por rol
+│   │   ├── errores.py        # Traduce errores de la base a mensajes HTTP
 │   │   └── v1/               # Versión 1 de la API (prefijo /api/v1)
 │   │       ├── router.py     # Junta todos los routers de endpoints
 │   │       └── endpoints/    # Un archivo por recurso (health.py, carreras.py, ...)
@@ -412,7 +466,7 @@ Gestion-asistencia/
 │       ├── css/
 │       ├── js/
 │       └── img/
-└── tests/                    # Tests con pytest
+└── tests/                    # Tests con pytest (conftest.py = fixtures compartidas)
 ```
 
 ### ¿Por qué el Dockerfile dice `fastapi run` y el compose `fastapi dev`?
@@ -432,7 +486,7 @@ Navegador / cliente
    → PostgreSQL
 ```
 
-Separar en capas hace que cada archivo tenga una sola responsabilidad: los endpoints no escriben SQL y los CRUD no saben nada de HTTP. El recurso **Carrera** es el ejemplo completo a seguir: [models](app/models/carrera.py) → [schemas](app/schemas/carrera.py) → [crud](app/crud/carrera.py) → [endpoints](app/api/v1/endpoints/carreras.py).
+Separar en capas hace que cada archivo tenga una sola responsabilidad: los endpoints no escriben SQL y los CRUD no saben nada de HTTP. El recurso **Carrera** es el ejemplo completo a seguir: [models](app/models/carrera.py) → [schemas](app/schemas/carrera.py) → [crud genérico](app/crud/base.py) → [endpoints](app/api/v1/endpoints/carreras.py). Para un caso con reglas de negocio, ver HU-02: [endpoints](app/api/v1/endpoints/docente.py) → [services](app/services/ausencias.py).
 
 ---
 
@@ -476,7 +530,7 @@ Ejemplo: agregar una tabla `Aula` con su API. Para los modelos que **ya existen*
        capacidad: int
    ```
 
-4. **CRUD**: `app/crud/aula.py`
+4. **CRUD**: para operaciones simples alcanza con el genérico [app/crud/base.py](app/crud/base.py) (`crud.crear(session, Aula.model_validate(data))`, `crud.listar(session, Aula)`, etc.), como hace [carreras.py](app/api/v1/endpoints/carreras.py). Si necesitás consultas propias, `app/crud/aula.py`:
 
    ```python
    from sqlmodel import Session, select
@@ -568,21 +622,26 @@ docker compose exec web pytest
 
 Opciones útiles: `pytest -v` (muestra cada test), `pytest tests/test_main.py` (un solo archivo), `pytest -k nombre` (los tests que contengan "nombre").
 
-Para escribir un test nuevo, creá un archivo `tests/test_<algo>.py` con funciones que empiecen con `test_`:
+Los tests corren contra la base de Docker (`localhost:5433`), así que necesitan el contenedor `db` levantado, pero **no dejan datos**: cada test se ejecuta dentro de una transacción que se revierte al terminar. Con `join_transaction_mode="create_savepoint"`, los `commit()` de los services solo cierran un savepoint.
+
+Fixtures de [tests/conftest.py](tests/conftest.py):
+
+| Fixture   | Qué da |
+|-----------|--------|
+| `session` | Sesión de base dentro de la transacción que se revierte. |
+| `client`  | `TestClient` que usa esa misma sesión. |
+| `datos`   | Carrera, materias, dos docentes con cátedras, un alumno, un admin y un docente sin perfil. |
+| `auth(usuario)` | Encabezado `Authorization` para ese usuario (función, no fixture). |
+
+Para reglas que dependen de la hora, los tests **fijan la hora actual** reemplazando `app.services.ausencias.ahora` (ver `fijar_ahora` en [tests/test_hu02_avisos.py](tests/test_hu02_avisos.py)).
 
 ```python
-from fastapi.testclient import TestClient
+from tests.conftest import auth
 
-from app.main import app
-
-client = TestClient(app)
-
-def test_health():
-    response = client.get("/api/v1/health")
-    assert response.status_code == 200
+def test_me(client, datos):
+    r = client.get("/api/v1/auth/me", headers=auth(datos["u_doc_a"]))
+    assert r.json()["rol"] == "docente"
 ```
-
-> Los tests que tocan la base (como este de `/health`) usan la misma base de desarrollo, así que necesitan el contenedor `db` levantado.
 
 ---
 
