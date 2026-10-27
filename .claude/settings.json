@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat)",
+      "Bash(echo \"secrets/\")",
+      "Bash(echo '{\"type\":\"service_account\"}')",
+      "Bash(git check-ignore *)"
+    ]
+  }
+}

@@ -8,3 +8,5 @@ __pycache__/
 # Credenciales (JSON del service account de Firebase, etc.)
 secrets/*
 !secrets/.gitkeep
+# Configuración personal de Claude Code (settings.json sí se comparte)
+.claude/settings.local.json
