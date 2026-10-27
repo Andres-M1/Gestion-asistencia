@@ -5,7 +5,8 @@ Uso (parado en la raíz del proyecto):
 
 Es idempotente: si un dato ya existe (por DNI, nombre, materia + comisión, etc.)
 lo saltea sin modificarlo, así se puede correr varias veces.
-Todos los usuarios tienen la contraseña PASSWORD.
+Todos los usuarios tienen la contraseña PASSWORD. Los emails usan @example.com, un dominio
+reservado que nunca entrega correo: probar las notificaciones (HU-06) no le escribe a nadie.
 """
 import sys
 from datetime import time
@@ -28,7 +29,7 @@ from app.services import personas
 
 PASSWORD = "prueba123"
 
-ADMIN = {"dni": "11111111", "email": "preceptor@test.com"}
+ADMIN = {"dni": "11111111", "email": "preceptor@example.com"}
 
 CARRERAS = {
     "Desarrollo de Software": ["Programación I", "Base de Datos"],
@@ -122,7 +123,7 @@ def cargar_docentes(session: Session) -> dict[str, Docente]:
         _contar(usuario is None)
         if usuario is None:
             data = DocenteCreate(dni=dni, password=PASSWORD, nombre=nombre, apellido=apellido,
-                                 email=f"docente.{dni}@test.com")
+                                 email=f"docente.{dni}@example.com")
             docentes[dni] = personas.crear(session, Docente, Rol.docente, data)
         elif usuario.docente is None:
             sys.exit(f"El DNI {dni} ya existe pero no es un docente")
@@ -139,7 +140,7 @@ def cargar_alumnos(session: Session) -> dict[str, Alumno]:
         if usuario is None:
             carrera = _primero(session, Carrera, Carrera.nombre == nombre_carrera)
             data = AlumnoCreate(dni=dni, password=PASSWORD, nombre=nombre, apellido=apellido,
-                                email=f"alumno.{dni}@test.com", carrera_id=carrera.id)
+                                email=f"alumno.{dni}@example.com", carrera_id=carrera.id)
             alumnos[dni] = personas.crear(session, Alumno, Rol.estudiante, data)
         elif usuario.alumno is None:
             sys.exit(f"El DNI {dni} ya existe pero no es un alumno")
