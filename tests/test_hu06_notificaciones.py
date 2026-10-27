@@ -11,6 +11,7 @@ from unittest import mock
 
 import pytest
 from firebase_admin import exceptions, messaging
+from sqlmodel import update
 
 from app.core import push
 from app.core.config import settings
@@ -30,6 +31,16 @@ def lunes_10hs(fijar_ahora):
     fijar_ahora(datetime(2026, 11, 2, 10, 0, tzinfo=AR))
 
 
+@pytest.fixture(autouse=True)
+def sin_preceptores_previos(session):
+    """Los correos van a TODOS los admins activos con email, y los tests corren contra la
+    base de desarrollo: se les quita el email a los admins que ya existían, dentro de la
+    transacción del test (que se revierte al final). Así los resultados no dependen de
+    los datos cargados y esos datos no se modifican."""
+    session.exec(update(Usuario).where(Usuario.rol == Rol.admin).values(email=None))
+    session.commit()
+
+
 def _guardar(session, *objetos):
     session.add_all(objetos)
     session.commit()
@@ -37,7 +48,7 @@ def _guardar(session, *objetos):
 
 
 @pytest.fixture
-def esc(session, datos):
+def esc(session, datos, sin_preceptores_previos):
     """Destinatarios posibles de un aviso en martes_a (Programación II 1K1)."""
     catedra = datos["martes_a"]
     carrera_id = datos["u_alumno"].alumno.carrera_id
