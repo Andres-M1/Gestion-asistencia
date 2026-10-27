@@ -5,3 +5,6 @@ __pycache__/
 .pytest_cache/
 .vscode/
 .idea/
+# Credenciales (JSON del service account de Firebase, etc.)
+secrets/*
+!secrets/.gitkeep

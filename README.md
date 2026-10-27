@@ -35,21 +35,13 @@ Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre e
 | HU-03  | Docente    | Ver el historial de sus avisos                             | ✅ `GET /docente/avisos` |
 | ~~HU-04~~ | —       | Cancelar aviso: **descartada** (un aviso no se cancela ni se edita) | ❌ |
 | HU-05  | Estudiante | Ver avisos de cátedras donde tiene inscripción vigente     | ✅ `GET /alumno/avisos` |
-| HU-06  | Estudiante / Preceptor | Notificación push + correo al registrarse un aviso | ⏳ |
+| HU-06  | Estudiante / Preceptor | Notificación push + correo al registrarse un aviso | ✅ [ver Notificaciones](#notificaciones-hu-06) |
 | HU-07  | Estudiante | Ver sus inscripciones vigentes y sus avisos                | ✅ `GET /alumno/inscripciones` |
 | HU-08  | Admin      | Alta de docentes y estudiantes                             | ✅ `/docentes`, `/alumnos` |
 | HU-09  | Admin      | Listar avisos con filtros                                  | ✅ `GET /admin/avisos` |
 | HU-10  | Admin      | Asignar docentes a materias (cátedras)                     | ✅ `/catedras` |
 
 Además: CRUD de administrador para carreras, materias e inscripciones (necesarios para cargar los datos).
-
------------------------------|---------------------------------------------------------------------------------------|
-| Modelos / tablas            | ✅ Todos creados: Carrera, Materia, Alumno, Docente, Cátedra, Inscripción, Ausencia    |
-| Migración inicial           | ✅ `alembic/versions/cd7107349f41_tablas_iniciales.py`                                 |
-| API de Carreras             | ✅ CRUD completo                                                                       |
-| API de salud (`/health`)    | ✅                                                                                     |
-| API del resto de recursos   | ⏳ Pendiente (seguir la [guía para agregar un recurso](#agregar-un-recurso-nuevo-guía)) |
-| Páginas web (HTML)          | ⏳ Solo la página de inicio                                                            |
 
 ---
 
@@ -85,6 +77,7 @@ pytest==9.1.1                # Tests
 pwdlib[argon2]==0.3.1        # Encriptado de contraseñas (Argon2)
 pyjwt==2.15.1                # Tokens de acceso (JWT)
 tzdata==2026.5               # Zonas horarias para zoneinfo (también en Windows)
+firebase-admin==7.7.0        # Notificaciones push (Firebase Cloud Messaging)
 ```
 
 No hace falta instalarlas a mano para correr la app: **Docker las instala solo** al construir la imagen. Solo las instalás en tu máquina (dentro de un entorno virtual) para que el editor autocomplete y para correr `alembic` y `pytest` desde la terminal (ver [paso 5](#paso-5-entorno-virtual-local-recomendado)).
@@ -247,6 +240,15 @@ Se definen en `.env` (plantilla: [.env.example](.env.example)) y las lee [app/co
 | `POSTGRES_DB`       | `gestion_asist`  | Nombre de la base de datos.                                              |
 | `POSTGRES_HOST`     | `localhost`      | Dónde está la base **vista desde tu máquina**.                           |
 | `POSTGRES_PORT`     | `5433`           | Puerto de la base **visto desde tu máquina**.                            |
+| `SECRET_KEY`        | (aleatoria)      | Clave para firmar los tokens de login. Generarla con `python -c "import secrets; print(secrets.token_urlsafe(48))"`. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `480`  | Duración del token de login.                                             |
+| `CORS_ORIGINS`      | `http://localhost:5173` | Orígenes del frontend web permitidos, separados por coma.         |
+| `SMTP_HOST`         | `smtp.gmail.com` | Servidor de correo (HU-06). **Vacío = no se envían correos.**            |
+| `SMTP_PORT`         | `587`            | Puerto SMTP (con STARTTLS).                                              |
+| `SMTP_USER`         | `cuenta@gmail.com` | Usuario SMTP.                                                          |
+| `SMTP_PASSWORD`     | (contraseña de aplicación) | Ver [Configurar Gmail](#configurar-gmail).                     |
+| `SMTP_FROM`         | `Gestion Asist <cuenta@gmail.com>` | Remitente. Vacío = `SMTP_USER`.                        |
+| `FIREBASE_CREDENTIALS` | `secrets/firebase.json` | Ruta al JSON del service account (HU-06). **Vacío = no se envían push.** Ver [Configurar Firebase](#configurar-firebase). |
 
 ### ¿Por qué `localhost:5433` y no `5432`?
 
@@ -295,6 +297,7 @@ erDiagram
         enum rol "admin | docente | estudiante"
         bool activo
         string email "opcional, para el preceptor"
+        string fcm_token "opcional, celular para push"
     }
     CARRERA {
         int id PK
@@ -374,6 +377,8 @@ Salvo `/health` y `/auth/login`, **todas las rutas piden un token**. En `/docs`:
 | GET    | `/api/v1/health`      | Todos   | Verifica que la API y la base respondan.     | `200` |
 | POST   | `/api/v1/auth/login`  | Todos   | Recibe `{dni, password}` y devuelve el token. | `200` · `401` DNI o contraseña incorrectos |
 | GET    | `/api/v1/auth/me`     | Logueado | Datos del usuario, su rol y su perfil.       | `200` · `401` |
+| PUT    | `/api/v1/auth/me/fcm-token` | Docente / alumno | Guarda `{token}` de Firebase del celular (HU-06). Si otro usuario tenía ese token, se le quita. | `204` · `403` admin · `422` token vacío |
+| DELETE | `/api/v1/auth/me/fcm-token` | Docente / alumno | Borra el token (al cerrar sesión en la app). | `204` · `403` admin |
 
 ### Docente (HU-02, HU-03)
 
@@ -448,11 +453,20 @@ Los listados aceptan `?offset=0&limit=100` (`limit` máximo: 100). Errores comun
 
 ### Crear el primer administrador
 
-Sin un admin nadie puede dar de alta usuarios. La contraseña se pide por teclado:
+Sin un admin nadie puede dar de alta usuarios. La contraseña se pide por teclado. El email es opcional (si no se pasa `--email`, se pide por teclado y se puede dejar vacío), pero **sin email el preceptor no recibe los correos de avisos** (HU-06):
 
 ```bash
-docker compose exec web python -m app.scripts.crear_admin --dni 12345678
+docker compose exec web python -m app.scripts.crear_admin --dni 12345678 --email preceptor@instituto.edu.ar
 ```
+
+Para cargarle el email a un admin **que ya existe**, sin borrarlo (cambiar el DNI y el email):
+
+```bash
+echo "UPDATE usuario SET email = 'preceptor@instituto.edu.ar' WHERE dni = '11111111' AND rol = 'admin';" \
+  | docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+Tiene que responder `UPDATE 1`. Si dice `UPDATE 0`, ese DNI no existe o no es admin.
 
 ### Cargar datos de prueba
 
@@ -463,6 +477,49 @@ docker compose exec web python -m app.scripts.cargar_datos_prueba
 ```
 
 Se puede correr varias veces: lo que ya existe (por DNI, nombre, materia + comisión, etc.) se saltea sin modificarlo. No crea avisos. Los datos quedan en la base de desarrollo; para borrarlos, empezar de cero con `docker compose down -v`.
+
+### Notificaciones (HU-06)
+
+Cuando un docente registra un aviso (`POST /docente/avisos`), la API responde enseguida y **en segundo plano** envía:
+
+| A quién | Qué |
+|---------|-----|
+| Cada alumno **activo** con inscripción **vigente** en esa cátedra | Correo (al email de su perfil) y push (si registró su celular) |
+| Cada preceptor (`admin`) **activo** con email | Correo |
+
+- **Un correo por destinatario** (nadie ve los emails de los demás). Texto plano: materia, comisión, fecha, horario y docente.
+- Push con Firebase Cloud Messaging, en tandas de hasta 500 celulares.
+- Si FCM responde que un token es `UNREGISTERED` (app desinstalada) o `SENDER_ID_MISMATCH` (token de otro proyecto), ese token se borra. Otros errores (incluido `INVALID_ARGUMENT`, que puede venir de un mensaje mal armado) solo se registran en el log.
+- **Si un envío falla, se registra en el log y se sigue con el resto. El aviso queda creado siempre.**
+- Si faltan `SMTP_HOST` o `FIREBASE_CREDENTIALS`, la app arranca igual: avisa en el log (`docker compose logs web`) y saltea ese tipo de envío.
+
+**App Android:** después del login y en `onNewToken`, llamar a `PUT /api/v1/auth/me/fcm-token` con `{"token": "<token de FCM>"}`. Al cerrar sesión, `DELETE /api/v1/auth/me/fcm-token`. Un celular por usuario.
+
+#### Configurar Gmail
+
+1. En la cuenta de Google que va a enviar los correos, activar la **verificación en 2 pasos** (https://myaccount.google.com/security).
+2. Crear una **contraseña de aplicación** en https://myaccount.google.com/apppasswords (nombre: "Gestion Asist"). Google muestra 16 caracteres: copiarlos **sin espacios**. Es distinta de la contraseña de la cuenta, que no funciona por SMTP.
+3. En el `.env`:
+
+   ```bash
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=cuenta@gmail.com
+   SMTP_PASSWORD=abcdefghijklmnop
+   SMTP_FROM="Gestion Asist <cuenta@gmail.com>"
+   ```
+
+4. Reiniciar: `docker compose down && docker compose up -d`. En los logs ya no debe aparecer "SMTP no configurado".
+
+Una cuenta personal de Gmail permite unos 500 destinatarios por día.
+
+#### Configurar Firebase
+
+1. En https://console.firebase.google.com abrir el proyecto (el **mismo** que usa la app Android).
+2. ⚙️ **Configuración del proyecto** → **Cuentas de servicio** → **Generar nueva clave privada**. Se descarga un JSON.
+3. Guardarlo como `secrets/firebase.json` dentro del proyecto. La carpeta `secrets/` está en `.gitignore` y `.dockerignore`: **ese archivo nunca se sube a git**. Si alguna vez se filtra, revocar la clave desde la misma pantalla.
+4. En el `.env`: `FIREBASE_CREDENTIALS=secrets/firebase.json` (la ruta es relativa a la raíz del proyecto; funciona igual dentro del contenedor).
+5. Reiniciar: `docker compose down && docker compose up -d`.
 
 ### Probar HU-02 en `/docs`
 
@@ -496,12 +553,14 @@ Gestion-asistencia/
 │   ├── core/                 # Configuración central
 │   │   ├── config.py         # Settings (lee .env) y arma la DATABASE_URL
 │   │   ├── database.py       # Engine de la BD y función get_session()
-│   │   └── security.py       # Contraseñas (Argon2) y tokens (JWT)
+│   │   ├── security.py       # Contraseñas (Argon2) y tokens (JWT)
+│   │   ├── correo.py         # Envío de correos (smtplib)
+│   │   └── push.py           # Envío de push (Firebase Cloud Messaging)
 │   ├── models/               # Modelos ORM = tablas de la base de datos (uno por archivo)
 │   │   └── __init__.py       # Importar aquí cada modelo para que Alembic lo detecte
 │   ├── schemas/              # Esquemas de entrada/salida de la API (qué recibe y devuelve)
 │   ├── crud/                 # Acceso a datos: base.py (CRUD genérico) y usuario.py
-│   ├── services/             # Reglas de negocio (auth, personas, ausencias)
+│   ├── services/             # Reglas de negocio (auth, personas, ausencias, inscripciones, notificaciones)
 │   ├── scripts/              # Comandos de consola (crear_admin.py)
 │   ├── api/                  # Capa HTTP
 │   │   ├── deps.py           # Dependencias comunes: sesión de BD, usuario actual, permisos por rol
@@ -516,6 +575,7 @@ Gestion-asistencia/
 │       ├── css/
 │       ├── js/
 │       └── img/
+├── secrets/                  # Credenciales (JSON de Firebase). No se sube a git
 └── tests/                    # Tests con pytest (conftest.py = fixtures compartidas)
 ```
 
@@ -681,9 +741,9 @@ Fixtures de [tests/conftest.py](tests/conftest.py):
 | `session` | Sesión de base dentro de la transacción que se revierte. |
 | `client`  | `TestClient` que usa esa misma sesión. |
 | `datos`   | Carrera, materias, dos docentes con cátedras, un alumno, un admin y un docente sin perfil. |
+| `fijar_ahora` | Fija la hora "actual" de las reglas de avisos: `fijar_ahora(datetime(..., tzinfo=ZONA))`. |
+| `envios`  | **Automática en todos los tests**: reemplaza SMTP y Firebase por versiones falsas que registran lo que se habría enviado (`envios.correos`, `envios.tandas_push`) y permiten simular fallos. **Los tests nunca envían correos ni push reales.** |
 | `auth(usuario)` | Encabezado `Authorization` para ese usuario (función, no fixture). |
-
-Para reglas que dependen de la hora, los tests **fijan la hora actual** reemplazando `app.services.ausencias.ahora` (ver `fijar_ahora` en [tests/test_hu02_avisos.py](tests/test_hu02_avisos.py)).
 
 ```python
 from tests.conftest import auth

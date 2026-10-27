@@ -1,12 +1,12 @@
-"""Endpoints del docente: /api/v1/docente (HU-02, HU-03)."""
-from fastapi import APIRouter, HTTPException, Query, status
+"""Endpoints del docente: /api/v1/docente (HU-02, HU-03; notificaciones de HU-06)."""
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
 
 from app.api.deps import DocenteUser, SessionDep
 from app.api.errores import manejar_integridad
 from app.models.docente import Docente
 from app.models.usuario import Usuario
 from app.schemas.ausencia import AvisoCreate, AvisoDetalle, ClaseDisponible
-from app.services import ausencias
+from app.services import ausencias, notificaciones
 
 router = APIRouter(prefix="/docente")
 
@@ -25,8 +25,9 @@ def clases_disponibles(usuario: DocenteUser, session: SessionDep):
 
 
 @router.post("/avisos", response_model=AvisoDetalle, status_code=status.HTTP_201_CREATED)
-def registrar_aviso(data: AvisoCreate, usuario: DocenteUser, session: SessionDep):
-    """Registra el aviso de que el docente no va a dar la clase (cátedra + fecha)."""
+def registrar_aviso(data: AvisoCreate, usuario: DocenteUser, session: SessionDep, background_tasks: BackgroundTasks):
+    """Registra el aviso de que el docente no va a dar la clase (cátedra + fecha) y,
+    en segundo plano, notifica a los alumnos inscriptos y a los preceptores (HU-06)."""
     docente = _perfil(usuario)
     try:
         with manejar_integridad(session):
@@ -35,7 +36,9 @@ def registrar_aviso(data: AvisoCreate, usuario: DocenteUser, session: SessionDep
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Cátedra no encontrada")
     except ausencias.AvisoInvalido as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
-    return ausencias.a_detalle(aviso)
+    detalle = ausencias.a_detalle(aviso)
+    notificaciones.programar(session, aviso, detalle, background_tasks)
+    return detalle
 
 
 @router.get("/avisos", response_model=list[AvisoDetalle])

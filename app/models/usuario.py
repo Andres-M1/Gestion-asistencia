@@ -22,6 +22,7 @@ class Usuario(SQLModel, table=True):
     rol: Rol
     activo: bool = True
     email: str | None = None  # para notificar al preceptor (admin); docentes y alumnos usan el de su perfil
+    fcm_token: str | None = None  # token de Firebase del celular (un dispositivo por usuario)
 
     # Relación 1 a 1: un usuario tiene como mucho un perfil (el admin no tiene ninguno)
     docente: Optional["Docente"] = Relationship(back_populates="usuario", sa_relationship_kwargs={"uselist": False})

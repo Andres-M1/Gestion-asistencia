@@ -3,19 +3,27 @@
 Cada test corre dentro de una transacción que se revierte al terminar. Con
 join_transaction_mode="create_savepoint", los commit() de services y crud
 solo cierran un savepoint: nada queda guardado en la base de Docker.
+
+Ningún test envía correos ni push reales: la fixture autouse `envios`
+reemplaza smtplib.SMTP y el envío de FCM por versiones falsas que registran
+lo que se habría enviado.
 """
+from contextlib import contextmanager
 from datetime import time
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.core import correo, push
+from app.core.config import settings
 from app.core.database import engine, get_session
 from app.core.security import create_access_token
 from app.main import app
 from app.models import Alumno, Carrera, Catedra, Docente, Materia, Usuario
 from app.models.usuario import Rol
-from app.services import ausencias
+from app.services import ausencias, notificaciones
 
 
 @pytest.fixture
@@ -32,12 +40,74 @@ def session():
 
 
 @pytest.fixture
-def client(session):
+def client(session, monkeypatch):
     app.dependency_overrides[get_session] = lambda: session
+
+    # El BackgroundTasks abre su propia sesión: en los tests, que use la del test
+    @contextmanager
+    def sesion_del_test():
+        yield session
+
+    monkeypatch.setattr(notificaciones, "abrir_sesion", sesion_del_test)
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def envios(monkeypatch):
+    """SMTP y FCM falsos para todos los tests. Por defecto, con configuración presente.
+
+    - envios.correos: mensajes "enviados" (EmailMessage).
+    - envios.tandas_push: lista de tandas de tokens enviadas a FCM.
+    - envios.fallar_correo_a: emails cuyo envío falla.
+    - envios.error_conexion_smtp / envios.error_fcm: excepción a lanzar (o None).
+    - envios.error_por_token: {token: excepción} que FCM devuelve para ese token.
+    """
+    registro = SimpleNamespace(correos=[], tandas_push=[], fallar_correo_a=set(),
+                               error_conexion_smtp=None, error_fcm=None, error_por_token={})
+
+    class SMTPFalso:
+        def __init__(self, host, port, timeout=None):
+            if registro.error_conexion_smtp:
+                raise registro.error_conexion_smtp
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def starttls(self):
+            pass
+
+        def login(self, usuario, password):
+            pass
+
+        def send_message(self, mensaje):
+            if mensaje["To"] in registro.fallar_correo_a:
+                raise OSError(f"fallo simulado enviando a {mensaje['To']}")
+            registro.correos.append(mensaje)
+
+    def fcm_falso(mensaje, app=None):
+        if registro.error_fcm:
+            raise registro.error_fcm
+        registro.tandas_push.append(list(mensaje.tokens))
+        respuestas = []
+        for token in mensaje.tokens:
+            error = registro.error_por_token.get(token)
+            respuestas.append(SimpleNamespace(success=error is None, exception=error))
+        return SimpleNamespace(responses=respuestas)
+
+    monkeypatch.setattr(correo.smtplib, "SMTP", SMTPFalso)
+    monkeypatch.setattr(push.messaging, "send_each_for_multicast", fcm_falso)
+    monkeypatch.setattr(push, "_obtener_app", lambda: object())
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.falso.test")
+    monkeypatch.setattr(settings, "SMTP_USER", "avisos@gestion-test.com.ar")
+    monkeypatch.setattr(settings, "SMTP_FROM", None)
+    monkeypatch.setattr(settings, "FIREBASE_CREDENTIALS", "secrets/falso.json")
+    return registro
 
 
 @pytest.fixture

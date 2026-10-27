@@ -1,4 +1,6 @@
 """Punto de entrada de la aplicación FastAPI."""
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -6,8 +8,17 @@ from fastapi.templating import Jinja2Templates
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.services.notificaciones import advertir_si_falta_configuracion
 
-app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    advertir_si_falta_configuracion()
+    yield
+
+
+app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
 # Permite que el frontend (otro origen/puerto) llame a la API
 app.add_middleware(

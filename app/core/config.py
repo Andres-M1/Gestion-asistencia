@@ -20,6 +20,16 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     CORS_ORIGINS: str = ""
 
+    # Correo (HU-06). Si falta SMTP_HOST, no se envían correos (warning en el log).
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USER: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM: str | None = None  # si no se define, se usa SMTP_USER
+
+    # Push (HU-06): ruta al JSON del service account de Firebase. Si falta, no se envían push.
+    FIREBASE_CREDENTIALS: str | None = None
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

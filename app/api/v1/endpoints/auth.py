@@ -1,15 +1,20 @@
-"""Endpoints de autenticación: /api/v1/auth (HU-01)."""
+"""Endpoints de autenticación: /api/v1/auth (HU-01) y token FCM del celular (HU-06)."""
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, requiere_rol
 from app.core.security import create_access_token
-from app.schemas.auth import LoginRequest, PerfilRead, Token, UsuarioMe
+from app.models.usuario import Rol, Usuario
+from app.schemas.auth import FcmTokenUpdate, LoginRequest, PerfilRead, Token, UsuarioMe
+from app.services import notificaciones
 from app.services.auth import autenticar
 
 router = APIRouter(prefix="/auth")
+
+# Solo los usuarios de la app Android (docentes y alumnos) registran un celular
+UsuarioApp = Annotated[Usuario, Depends(requiere_rol(Rol.docente, Rol.estudiante))]
 
 
 def _login(session: SessionDep, dni: str, password: str) -> Token:
@@ -45,3 +50,16 @@ def me(usuario: CurrentUser):
         rol=usuario.rol,
         perfil=PerfilRead.model_validate(perfil, from_attributes=True) if perfil else None,
     )
+
+
+@router.put("/me/fcm-token", status_code=status.HTTP_204_NO_CONTENT)
+def registrar_fcm_token(data: FcmTokenUpdate, usuario: UsuarioApp, session: SessionDep):
+    """La app lo llama después del login y en onNewToken. Si otro usuario tenía ese
+    token (mismo celular), se le quita."""
+    notificaciones.asignar_token(session, usuario, data.token)
+
+
+@router.delete("/me/fcm-token", status_code=status.HTTP_204_NO_CONTENT)
+def borrar_fcm_token(usuario: UsuarioApp, session: SessionDep):
+    """La app lo llama al cerrar sesión: el celular deja de recibir push."""
+    notificaciones.asignar_token(session, usuario, None)
