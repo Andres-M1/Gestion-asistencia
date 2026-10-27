@@ -15,6 +15,7 @@ from app.core.security import create_access_token
 from app.main import app
 from app.models import Alumno, Carrera, Catedra, Docente, Materia, Usuario
 from app.models.usuario import Rol
+from app.services import ausencias
 
 
 @pytest.fixture
@@ -37,6 +38,14 @@ def client(session):
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def fijar_ahora(monkeypatch):
+    """Devuelve una función para fijar la hora "actual" que usan las reglas de avisos."""
+    def fijar(momento):
+        monkeypatch.setattr(ausencias, "ahora", lambda: momento)
+    return fijar
 
 
 def auth(usuario: Usuario) -> dict:

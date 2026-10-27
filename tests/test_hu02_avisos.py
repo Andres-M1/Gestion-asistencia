@@ -16,13 +16,6 @@ CLASES = "/api/v1/docente/clases-disponibles"
 AVISOS = "/api/v1/docente/avisos"
 
 
-@pytest.fixture
-def fijar_ahora(monkeypatch):
-    def fijar(momento: datetime):
-        monkeypatch.setattr(ausencias, "ahora", lambda: momento)
-    return fijar
-
-
 @pytest.fixture(autouse=True)
 def lunes_10hs(fijar_ahora):
     fijar_ahora(datetime(2026, 11, 2, 10, 0, tzinfo=AR))

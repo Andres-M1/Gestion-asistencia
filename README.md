@@ -34,9 +34,9 @@ Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre e
 | HU-02  | Docente    | Registrar aviso eligiendo una clase concreta de una lista  | ✅ `/docente/clases-disponibles`, `/docente/avisos` |
 | HU-03  | Docente    | Ver el historial de sus avisos                             | ✅ `GET /docente/avisos` |
 | ~~HU-04~~ | —       | Cancelar aviso: **descartada** (un aviso no se cancela ni se edita) | ❌ |
-| HU-05  | Estudiante | Ver avisos de cátedras donde tiene inscripción vigente     | ⏳ |
+| HU-05  | Estudiante | Ver avisos de cátedras donde tiene inscripción vigente     | ✅ `GET /alumno/avisos` |
 | HU-06  | Estudiante / Preceptor | Notificación push + correo al registrarse un aviso | ⏳ |
-| HU-07  | Estudiante | Ver sus inscripciones vigentes y sus avisos                | ⏳ |
+| HU-07  | Estudiante | Ver sus inscripciones vigentes y sus avisos                | ✅ `GET /alumno/inscripciones` |
 | HU-08  | Admin      | Alta de docentes y estudiantes                             | ✅ `/docentes`, `/alumnos` |
 | HU-09  | Admin      | Listar avisos con filtros                                  | ⏳ |
 | HU-10  | Admin      | Asignar docentes a materias (cátedras)                     | ✅ `/catedras` |
@@ -404,6 +404,19 @@ Cada aviso se devuelve como **`AvisoDetalle`** (lo reusan HU-05 y HU-09). No inc
 ```
 
 Todo se calcula en **hora de Argentina** (`America/Argentina/Buenos_Aires`), aunque el contenedor esté en UTC. El `POST` vuelve a validar todo en el servidor: no confía en que el cliente mandó una opción de la lista. La lógica está en [app/services/ausencias.py](app/services/ausencias.py).
+
+### Alumno (HU-05, HU-07)
+
+| Método | Ruta                            | Qué hace | Respuestas |
+|--------|---------------------------------|----------|------------|
+| GET    | `/api/v1/alumno/inscripciones`  | Inscripciones **vigentes** del alumno: `catedra_id`, materia, comisión, día, horario y docente `{nombre, apellido}`. Ordenadas por día y hora. Sin paginación. | `200` · `403` no es alumno |
+| GET    | `/api/v1/alumno/avisos`         | Avisos de **hoy en adelante** (hora de Argentina) de las cátedras donde tiene inscripción vigente, del más próximo al más lejano. Devuelve `AvisoDetalle`. Paginado con `?offset=&limit=`. | `200` · `403` no es alumno · `404` con `?catedra_id=` de una cátedra donde no tiene inscripción vigente |
+
+- Una inscripción con `vigente=false` no aparece en la lista ni hace ver sus avisos.
+- Un aviso de hoy se sigue viendo todo el día, aunque la clase ya haya terminado. A partir de mañana deja de aparecer.
+- Desde cada inscripción de HU-07, la app puede pedir `GET /alumno/avisos?catedra_id=<catedra_id>` para ver solo los avisos de esa cátedra.
+
+**Probar en `/docs`** con los [datos de prueba](#cargar-datos-de-prueba): loguearse como `33333331` / `prueba123`. Tiene 2 inscripciones vigentes (Programación I 1K1 y Base de Datos 1K1) y una no vigente (Programación I 1K2). Desde un docente (`22222222` o `22222223`) registrar un aviso y verlo desde el alumno.
 
 ### Administrador (HU-08, HU-10)
 

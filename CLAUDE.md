@@ -24,9 +24,9 @@ Implementar **solo** estas historias de usuario. No agregar funcionalidades, rol
 | HU-02 | Docente | Registrar aviso eligiendo **una clase concreta** de una lista (ver reglas abajo). No elige fecha libre ni escribe motivo. | ✅ hecho (`/docente/clases-disponibles`, `POST /docente/avisos`) |
 | HU-03 | Docente | Ver el historial de sus avisos | ✅ hecho (`GET /docente/avisos`) |
 | ~~HU-04~~ | — | **Descartada.** Un aviso registrado no se cancela ni se edita. | ❌ |
-| HU-05 | Estudiante | Ver avisos solo de cátedras donde tiene inscripción vigente | ⏳ |
+| HU-05 | Estudiante | Ver avisos solo de cátedras donde tiene inscripción vigente | ✅ hecho (`GET /alumno/avisos`) |
 | HU-06 | Estudiante / Preceptor | Al registrarse un aviso: cada alumno con inscripción vigente en esa cátedra recibe **push + correo**; los preceptores reciben **correo** | ⏳ |
-| HU-07 | Estudiante | Ver sus inscripciones vigentes (materia, comisión, docente) y desde cada una sus avisos | ⏳ |
+| HU-07 | Estudiante | Ver sus inscripciones vigentes (materia, comisión, docente) y desde cada una sus avisos | ✅ hecho (`GET /alumno/inscripciones`; avisos por cátedra con `GET /alumno/avisos?catedra_id=`) |
 | HU-08 | Admin | Alta de docentes y estudiantes con DNI y contraseña | ✅ hecho |
 | HU-09 | Admin | Listar avisos filtrando por carrera, materia, comisión, docente y fecha | ⏳ |
 | HU-10 | Admin | Asignar docentes a materias (= crear/editar cátedras) | ✅ hecho |

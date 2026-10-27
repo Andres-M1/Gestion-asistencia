@@ -1,4 +1,4 @@
-"""Reglas de negocio de los avisos de ausencia (HU-02, HU-03).
+"""Reglas de negocio de los avisos de ausencia (HU-02, HU-03, HU-05).
 
 Una clase = una cátedra en una fecha concreta. El docente puede avisar sobre una clase si:
   - la cátedra es suya;
@@ -17,7 +17,9 @@ from sqlmodel import Session, select
 from app.crud import base as crud
 from app.models.ausencia import Ausencia
 from app.models.catedra import Catedra
+from app.models.alumno import Alumno
 from app.models.docente import Docente
+from app.models.inscripcion import Inscripcion
 from app.schemas.ausencia import AvisoDetalle, ClaseDisponible, DocenteResumen
 
 ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
@@ -31,6 +33,10 @@ class CatedraNoEncontrada(Exception):
 
 class AvisoInvalido(Exception):
     """La clase elegida no cumple las reglas para registrar un aviso."""
+
+
+class SinInscripcionVigente(Exception):
+    """El alumno no tiene una inscripción vigente en la cátedra pedida."""
 
 
 def ahora() -> datetime:
@@ -123,6 +129,13 @@ def a_detalle(aviso: Ausencia) -> AvisoDetalle:
     )
 
 
+def _con_detalle(consulta):
+    """Carga cátedra, materia y docente de cada aviso en 3 consultas en total, no una por aviso."""
+    return consulta.options(
+        selectinload(Ausencia.catedra).options(selectinload(Catedra.materia), selectinload(Catedra.docente))
+    )
+
+
 def avisos_del_docente(session: Session, docente: Docente, offset: int = 0, limit: int = 100) -> list[AvisoDetalle]:
     """Historial de avisos del docente (HU-03), pasados y futuros, del más nuevo al más viejo.
 
@@ -133,10 +146,38 @@ def avisos_del_docente(session: Session, docente: Docente, offset: int = 0, limi
         select(Ausencia)
         .join(Catedra)
         .where(Catedra.docente_id == docente.id)
-        # Carga cátedra, materia y docente en 3 consultas en total, no una por aviso
-        .options(selectinload(Ausencia.catedra).options(selectinload(Catedra.materia), selectinload(Catedra.docente)))
         .order_by(Ausencia.fecha.desc(), Catedra.hora_inicio.desc(), Ausencia.id.desc())
         .offset(offset)
         .limit(limit)
     )
-    return [a_detalle(aviso) for aviso in session.exec(consulta)]
+    return [a_detalle(aviso) for aviso in session.exec(_con_detalle(consulta))]
+
+
+def avisos_del_alumno(
+    session: Session, alumno: Alumno, catedra_id: int | None = None, offset: int = 0, limit: int = 100
+) -> list[AvisoDetalle]:
+    """Avisos de hoy en adelante (hora de Argentina) de las cátedras donde el alumno
+    tiene inscripción vigente (HU-05), del más próximo al más lejano.
+
+    Con catedra_id, solo los de esa cátedra; si el alumno no tiene inscripción
+    vigente en ella, lanza SinInscripcionVigente.
+    """
+    vigentes = select(Inscripcion.catedra_id).where(
+        Inscripcion.alumno_id == alumno.id, Inscripcion.vigente == True  # noqa: E712
+    )
+    if catedra_id is not None:
+        if session.exec(vigentes.where(Inscripcion.catedra_id == catedra_id)).first() is None:
+            raise SinInscripcionVigente
+        de_sus_catedras = Ausencia.catedra_id == catedra_id
+    else:
+        de_sus_catedras = Ausencia.catedra_id.in_(vigentes)
+
+    consulta = (
+        select(Ausencia)
+        .join(Catedra)
+        .where(de_sus_catedras, Ausencia.fecha >= _ahora_argentina().date())
+        .order_by(Ausencia.fecha, Catedra.hora_inicio, Ausencia.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return [a_detalle(aviso) for aviso in session.exec(_con_detalle(consulta))]
