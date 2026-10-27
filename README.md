@@ -11,18 +11,21 @@ Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre e
 1. [Estado del proyecto](#estado-del-proyecto)
 2. [Tecnologías utilizadas](#tecnologías-utilizadas)
 3. [Dependencias](#dependencias)
-4. [Requisitos previos](#requisitos-previos)
-5. [Instalación paso a paso](#instalación-paso-a-paso)
-6. [Variables de entorno](#variables-de-entorno)
-7. [Modelo de datos](#modelo-de-datos)
-8. [API: endpoints disponibles](#api-endpoints-disponibles)
-9. [Estructura de carpetas](#estructura-de-carpetas)
-10. [Cómo fluye un request](#cómo-fluye-un-request)
-11. [Agregar un recurso nuevo (guía)](#agregar-un-recurso-nuevo-guía)
-12. [Migraciones de base de datos](#migraciones-de-base-de-datos)
-13. [Tests](#tests)
-14. [Comandos útiles](#comandos-útiles)
-15. [Solución de problemas](#solución-de-problemas)
+4. [Instalación](#instalación)
+   - [Windows (con WSL2)](#windows-con-wsl2)
+   - [Linux (Ubuntu / Debian)](#linux-ubuntu--debian)
+   - [Opcional: correos con Gmail](#opcional-correos-con-gmail) · [Opcional: push con Firebase](#opcional-push-con-firebase)
+   - [¿Quedó todo bien?](#quedó-todo-bien)
+5. [Variables de entorno](#variables-de-entorno)
+6. [Modelo de datos](#modelo-de-datos)
+7. [API: endpoints disponibles](#api-endpoints-disponibles)
+8. [Estructura de carpetas](#estructura-de-carpetas)
+9. [Cómo fluye un request](#cómo-fluye-un-request)
+10. [Agregar un recurso nuevo (guía)](#agregar-un-recurso-nuevo-guía)
+11. [Migraciones de base de datos](#migraciones-de-base-de-datos)
+12. [Tests](#tests)
+13. [Comandos útiles](#comandos-útiles)
+14. [Solución de problemas](#solución-de-problemas)
 
 ---
 
@@ -80,7 +83,7 @@ tzdata==2026.5               # Zonas horarias para zoneinfo (también en Windows
 firebase-admin==7.7.0        # Notificaciones push (Firebase Cloud Messaging)
 ```
 
-No hace falta instalarlas a mano para correr la app: **Docker las instala solo** al construir la imagen. Solo las instalás en tu máquina (dentro de un entorno virtual) para que el editor autocomplete y para correr `alembic` y `pytest` desde la terminal (ver [paso 5](#paso-5-entorno-virtual-local-recomendado)).
+No hace falta instalarlas a mano para correr la app: **Docker las instala solo** al construir la imagen. Solo las instalás en tu máquina (dentro de un entorno virtual) para que el editor autocomplete y para correr `alembic` y `pytest` desde la terminal (ver el paso D5 en [Windows](#windows-con-wsl2) o L9 en [Linux](#linux-ubuntu--debian)).
 
 **Para agregar una dependencia nueva:**
 
@@ -91,126 +94,639 @@ No hace falta instalarlas a mano para correr la app: **Docker las instala solo**
 
 ---
 
-## Requisitos previos
+## Instalación
 
-Necesitás tener instalado:
+Esta guía es para alguien que **nunca usó el proyecto**. Seguí la sección de tu sistema de principio a fin: cada una está completa.
 
-| Programa            | Para qué                                  | Cómo verificar que está     |
-|---------------------|-------------------------------------------|-----------------------------|
-| **Git**             | Descargar el código                       | `git --version`             |
-| **Docker**          | Correr la app y la base de datos          | `docker --version`          |
-| **Docker Compose**  | Levantar los dos contenedores juntos      | `docker compose version`    |
-| **Python 3.12**     | Entorno virtual local (opcional, recomendado) | `python3 --version`     |
+**Qué vas a tener al final**
 
-### Linux (Ubuntu / Debian)
+| Qué | Dónde |
+|-----|-------|
+| La API (contenedor `web`) | http://localhost:8000 · documentación interactiva en http://localhost:8000/docs |
+| La base de datos PostgreSQL (contenedor `db`) | `localhost:5433` desde tu máquina. Hay **una sola base**: la del contenedor |
+| Un usuario administrador tuyo y datos de prueba | Para loguearte en `/docs` |
+| Un entorno virtual `.venv` | Para que el editor autocomplete y para correr los tests |
 
-```bash
-# Git y Python (con soporte para entornos virtuales)
-sudo apt update
-sudo apt install -y git python3 python3-venv python3-pip
+No hace falta instalar PostgreSQL: lo trae Docker.
 
-# Docker y Compose
-sudo apt install -y docker.io docker-compose-v2
+| Si usás… | Seguí |
+|----------|-------|
+| Windows 10 / 11 | [Windows (con WSL2)](#windows-con-wsl2) |
+| Ubuntu o Debian | [Linux (Ubuntu / Debian)](#linux-ubuntu--debian) |
 
-# Usar Docker sin sudo (después cerrá sesión y volvé a entrar)
-sudo usermod -aG docker $USER
-```
-
-> Si preferís la versión más reciente de Docker, seguí la [guía oficial de Docker Engine](https://docs.docker.com/engine/install/ubuntu/).
-
-### Windows
-
-En Windows se trabaja **dentro de WSL** (un Linux integrado en Windows):
-
-1. Abrir PowerShell como administrador y ejecutar `wsl --install`. Reiniciar.
-2. Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/) y, en *Settings → Resources → WSL Integration*, activar la integración con tu distribución (Ubuntu).
-3. Abrir la terminal de **Ubuntu (WSL)** e instalar Git y Python con los comandos de la sección de Linux (sin la parte de Docker, que ya la da Docker Desktop).
-4. Seguir todos los pasos de abajo **desde la terminal de WSL**.
-
-> Clonar el proyecto dentro del sistema de archivos de WSL (por ejemplo `~/proyectos`), **no** en `/mnt/c/...`: es mucho más rápido y evita problemas de permisos.
-
-### macOS
-
-Instalar [Docker Desktop](https://www.docker.com/products/docker-desktop/) y, con [Homebrew](https://brew.sh/): `brew install git python@3.12`.
+Las configuraciones de [correo (Gmail)](#opcional-correos-con-gmail) y [push (Firebase)](#opcional-push-con-firebase) son **opcionales**: la app funciona sin ellas.
 
 ---
 
-## Instalación paso a paso
+### Windows (con WSL2)
 
-Todos los comandos se ejecutan **parado en la carpeta raíz del proyecto** (donde están `app/`, `.env` y `docker-compose.yml`), salvo el primero.
+En Windows el proyecto se usa **dentro de WSL2**: un Ubuntu real que corre integrado en Windows. Docker Desktop y VS Code se instalan en Windows y trabajan con ese Ubuntu.
 
-### Paso 1: Clonar el repositorio
+#### Parte A: Instalación inicial (una sola vez, fuera de VS Code)
 
-```bash
-git clone https://github.com/Andres-M1/Gestion-asistencia.git
-cd Gestion-asistencia
+**A1. Comprobar la versión de Windows y la virtualización**
+
+WSL2 necesita Windows 10 versión 2004 o posterior (compilación 19041+) o Windows 11, y la virtualización del procesador activada.
+
+1. Tecla Windows + R → escribir `winver` → Enter. Tiene que decir **Windows 11**, o **Windows 10 Versión 2004** o mayor (20H2, 21H2, 22H2…).
+2. Abrir el **Administrador de tareas** (Ctrl+Shift+Esc) → pestaña **Rendimiento** → **CPU**. Abajo a la derecha tiene que decir **Virtualización: Habilitado**.
+
+> **Si falla:**
+> - Windows 10 más viejo que 2004: actualizarlo desde *Configuración → Windows Update*.
+> - "Virtualización: Deshabilitado": hay que activarla en la BIOS/UEFI. Reiniciar la PC y entrar a la configuración (según la marca, tecla **F2**, **F10**, **Supr/Del** o **Esc** al encender; en Windows 11 también desde *Configuración → Sistema → Recuperación → Inicio avanzado → Opciones avanzadas → Configuración de firmware UEFI*). Buscar la opción **Intel Virtualization Technology (VT-x)** o **AMD SVM / AMD-V**, ponerla en *Enabled*, guardar y salir (normalmente F10).
+
+**A2. Instalar WSL**
+
+Instala WSL2 y Ubuntu.
+
+1. Menú Inicio → escribir **PowerShell** → clic derecho en *Windows PowerShell* → **Ejecutar como administrador**.
+2. Ejecutar:
+
+   ```powershell
+   wsl --install
+   ```
+
+3. Cuando termine, **reiniciar la PC**.
+
+Si salió bien, el comando muestra que instala "Plataforma de máquina virtual", "Subsistema de Windows para Linux" y "Ubuntu", y pide reiniciar.
+
+> **Si falla:**
+> - Muestra la ayuda de `wsl` en vez de instalar: WSL ya estaba instalado. Instalar solo Ubuntu con `wsl --install -d Ubuntu`.
+> - Error `0x80370102`: la virtualización está deshabilitada (ver A1).
+> - Error `0x8007019e`: ejecutar `wsl --install` otra vez **como administrador** y reiniciar.
+
+**A3. Primera apertura de Ubuntu: usuario y contraseña de Linux**
+
+Después de reiniciar se abre sola una ventana de **Ubuntu** (si no, abrirla desde el menú Inicio → *Ubuntu*). La primera vez tarda unos minutos y pide:
+
+```text
+Enter new UNIX username: tunombre
+New password:
+Retype new password:
 ```
 
-### Paso 2: Crear el archivo `.env`
+- El usuario: en minúsculas, sin espacios ni acentos (ej. `andres`).
+- La contraseña **no se ve mientras la escribís** (ni asteriscos): es normal. Escribila y Enter.
+- **Anotala**: es la que te va a pedir `sudo` cada vez que instales algo en Ubuntu. No tiene que ser la de Windows.
 
-El `.env` guarda la configuración (usuario y contraseña de la base, etc.). No se sube a git; se crea a partir de la plantilla:
+Si salió bien, termina en una línea como `tunombre@NOMBRE-PC:~$`.
+
+> **Si falla:** si te equivocaste en la contraseña al repetirla, la vuelve a pedir. Si cerraste la ventana antes de terminar, abrí *Ubuntu* de nuevo desde el menú Inicio.
+
+**A4. Verificar que Ubuntu use WSL 2**
+
+En **PowerShell** (no hace falta que sea administrador):
+
+```powershell
+wsl -l -v
+```
+
+Tiene que verse algo así, con **VERSION 2**:
+
+```text
+  NAME      STATE           VERSION
+* Ubuntu    Running         2
+```
+
+> **Si falla:**
+> - Dice `VERSION 1`: convertirla con `wsl --set-version Ubuntu 2` y dejar la 2 por defecto con `wsl --set-default-version 2`.
+> - No aparece Ubuntu: `wsl --install -d Ubuntu`.
+> - Algún error de versión del kernel: `wsl --update` y volver a probar.
+
+**A5. Instalar Docker Desktop**
+
+Docker Desktop corre los contenedores de la app y de la base, y los comparte con Ubuntu.
+
+1. Descargar e instalar **Docker Desktop for Windows** desde https://www.docker.com/products/docker-desktop/. Durante la instalación dejar marcada **Use WSL 2 instead of Hyper-V** (o similar).
+2. Abrir Docker Desktop (aceptar los términos; no hace falta crear cuenta).
+3. Ir a **Settings** (engranaje) → **General** → verificar que esté marcado **Use the WSL 2 based engine**.
+4. **Settings → Resources → WSL Integration** → activar el interruptor de **Ubuntu** → **Apply & restart**.
+5. Abrir **Ubuntu** y verificar:
+
+   ```bash
+   docker --version
+   docker compose version
+   docker run hello-world
+   ```
+
+Si salió bien: `Docker version 2x.x.x`, `Docker Compose version v2.x` o mayor, y `hello-world` imprime **Hello from Docker!**
+
+> **Si falla:** ver en la [Parte E](#parte-e-problemas-comunes-en-windows) "docker: command not found" y "Docker Desktop no arranca". Docker Desktop tiene que **estar abierto** (ícono de la ballena en la barra de tareas) cada vez que uses el proyecto.
+
+**A6. Instalar VS Code y la extensión WSL**
+
+1. Instalar **Visual Studio Code** para Windows desde https://code.visualstudio.com/ (dejar marcada la opción **Agregar a PATH**).
+2. Abrir VS Code → **Extensiones** (Ctrl+Shift+X) → buscar **WSL** (de **Microsoft**) → **Instalar**.
+
+Si salió bien, abajo a la izquierda aparece un ícono `><` (indicador remoto).
+
+> **Si falla:** si no encontrás la extensión, buscá por su identificador `ms-vscode-remote.remote-wsl`.
+
+#### Parte B: Dónde escribir los comandos
+
+Todos los comandos de las partes C y D se escriben en una **terminal de Ubuntu (WSL)**, nunca en PowerShell ni en CMD. Hay dos formas equivalentes de abrirla:
+
+**Opción 1 (recomendada): terminal de VS Code conectada a WSL**
+
+1. En VS Code: **F1** → escribir **WSL: Connect to WSL** → Enter. Se abre una ventana nueva.
+2. Abajo a la izquierda tiene que decir **WSL: Ubuntu**.
+3. Abrir la terminal: menú **Terminal → Nueva terminal** (o **Ctrl+`**; en teclado español suele ser **Ctrl+ñ**). El prompt se ve como `tunombre@NOMBRE-PC:~$`.
+
+> ⚠️ Si abajo a la izquierda **no** dice *WSL: Ubuntu*, esa terminal es de **Windows** (PowerShell) y los comandos van a fallar.
+
+**Opción 2: la app Ubuntu**
+
+1. Menú Inicio → **Ubuntu**.
+2. Más adelante, para abrir el proyecto en VS Code, desde esa terminal: `code .` (lo abre ya conectado a WSL).
+
+Desde acá, **todos los comandos son iguales en las dos opciones**.
+
+#### Parte C: Preparar Ubuntu (dentro de WSL)
+
+**C1. Instalar Git y Python 3.12**
+
+Git descarga el código; Python se usa para el entorno virtual (`.venv`), los tests y generar la clave secreta.
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-venv python3-pip
+git --version
+python3 --version
+```
+
+`sudo` pide la contraseña de Linux de A3 (no se ve al escribirla). Si salió bien: `git version 2.x` y **`Python 3.12.x`** (es la que trae Ubuntu 24.04, la que instala `wsl --install`).
+
+> **Si falla:**
+> - `python3 --version` muestra 3.10 (Ubuntu 22.04): instalar 3.12 con `sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt update && sudo apt install -y python3.12 python3.12-venv` y, en D5, usar `python3.12` en lugar de `python3`.
+> - `Temporary failure resolving`: Ubuntu no tiene internet; reiniciar WSL desde PowerShell con `wsl --shutdown` y abrir Ubuntu otra vez.
+
+**C2. Configurar Git**
+
+Tu nombre y email quedan en los commits. `core.autocrlf input` evita que se mezclen finales de línea de Windows (CRLF) en los archivos.
+
+```bash
+git config --global user.name "Tu Nombre"
+git config --global user.email "tu@mail.com"
+git config --global core.autocrlf input
+git config --global --list
+```
+
+Si salió bien, la lista muestra `user.name`, `user.email` y `core.autocrlf=input`.
+
+**C3. No instalar Docker dentro de Ubuntu**
+
+Docker ya lo da **Docker Desktop** (A5). Si además lo instalás en Ubuntu (`apt install docker.io`), los dos se pisan y aparecen errores difíciles de entender. Si `docker run hello-world` funcionó en A5, no hace falta nada más.
+
+#### Parte D: El proyecto
+
+**D1. Crear la carpeta y clonar**
+
+El proyecto va **dentro del sistema de archivos de Ubuntu** (`~/proyectos`), **no** en `/mnt/c/...` (el disco C: de Windows): desde WSL, `/mnt/c` es mucho más lento, da problemas de permisos y la recarga automática de la app no detecta los cambios.
+
+```bash
+mkdir -p ~/proyectos
+cd ~/proyectos
+git clone https://github.com/Andres-M1/Gestion-asistencia.git
+cd Gestion-asistencia
+ls
+```
+
+Si salió bien, `ls` muestra, entre otros: `alembic  app  docker-compose.yml  Dockerfile  README.md  requirements.txt  tests`.
+
+> **Si falla:** `Repository not found` o pide usuario y contraseña: revisá la URL o pedí acceso al repositorio. Desde acá, **todos los comandos se ejecutan parado en `~/proyectos/Gestion-asistencia`**.
+
+**D2. Abrir el proyecto en VS Code conectado a WSL**
+
+```bash
+code .
+```
+
+Se abre VS Code con la carpeta del proyecto y abajo a la izquierda **WSL: Ubuntu**. La primera vez instala el "VS Code Server" en Ubuntu (tarda un minuto). Si te pregunta si confiás en los autores de la carpeta, **Sí**.
+
+> **Si falla:** `code: command not found`: cerrá y volvé a abrir la terminal de Ubuntu; si sigue, en VS Code (Windows) usá **F1 → WSL: Connect to WSL** y después **Archivo → Abrir carpeta** → `/home/tunombre/proyectos/Gestion-asistencia`.
+
+**D3. Crear el `.env` y generar `SECRET_KEY`**
+
+El `.env` tiene la configuración (base de datos, clave de los tokens, correo…). No se sube a git; se crea desde la plantilla `.env.example`. `SECRET_KEY` es **obligatoria**: firma los tokens de login y tiene que ser larga y aleatoria.
 
 ```bash
 cp .env.example .env
+sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')|" .env
+grep SECRET_KEY .env
 ```
 
-Para desarrollo local los valores de ejemplo sirven tal cual. Si querés, cambiá usuario, contraseña y nombre de la base (ver [Variables de entorno](#variables-de-entorno)).
+Si salió bien, `grep` muestra `SECRET_KEY=` seguido de unos 64 caracteres al azar (ya no dice `cambiar-por-una-clave-larga-y-aleatoria`). El resto de los valores de ejemplo sirven tal cual para desarrollo (ver [Variables de entorno](#variables-de-entorno)).
 
-> La primera vez que arranca, el contenedor de PostgreSQL **crea solo** ese usuario y esa base. No hace falta instalar PostgreSQL ni usar `psql`.
+> **Si falla:** `cp: cannot stat '.env.example'`: no estás en la carpeta del proyecto (`cd ~/proyectos/Gestion-asistencia`). Si preferís hacerlo a mano: `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`, copiar el resultado y pegarlo en el `.env` después de `SECRET_KEY=`.
 
-### Paso 3: Levantar todo
+**D4. Levantar la app con Docker**
+
+Construye la imagen de la app, arranca PostgreSQL, crea las tablas (migraciones) y levanta la API.
 
 ```bash
-docker compose up --build
+docker compose up -d --build
+docker compose ps
 ```
 
-La primera vez tarda unos minutos (descarga imágenes e instala dependencias). Esto:
-
-1. Construye la imagen de la app (Python + dependencias + código).
-2. Arranca PostgreSQL y espera a que esté listo para recibir conexiones.
-3. Aplica las migraciones (`alembic upgrade head`), que crean las tablas.
-4. Levanta FastAPI en modo desarrollo, **con recarga automática**: si editás el código, la app se reinicia sola.
-
-Sabés que está listo cuando en los logs aparece algo como:
+La primera vez tarda unos minutos (descarga imágenes e instala dependencias). Si salió bien, `docker compose ps` muestra dos líneas (resumido; hay más columnas):
 
 ```text
-web-1  |       INFO   Application startup complete.
+SERVICE   STATUS                    PORTS
+db        Up ... (healthy)          0.0.0.0:5433->5432/tcp
+web       Up ...                    0.0.0.0:8000->8000/tcp
 ```
 
-> Para dejarlo corriendo en segundo plano y recuperar la terminal: `docker compose up -d --build`.
-
-### Paso 4: Verificar que funciona
-
-Abrí en el navegador:
-
-| URL                                        | Qué deberías ver                                    |
-|--------------------------------------------|-----------------------------------------------------|
-| http://localhost:8000                      | Página de inicio: "La aplicación está funcionando". |
-| http://localhost:8000/docs                 | Documentación interactiva de la API (Swagger).      |
-| http://localhost:8000/api/v1/health        | `{"status":"ok","database":"ok"}`                   |
-
-Si `/health` responde `ok`, la app y la base de datos están conectadas. 🎉
-
-Para detener: `Ctrl+C` (o `docker compose down` si lo levantaste con `-d`). Los datos **se conservan** entre reinicios.
-
-### Paso 5: Entorno virtual local (recomendado)
-
-La app ya corre en Docker, pero conviene tener las dependencias también en tu máquina para:
-
-- que VS Code (u otro editor) autocomplete y marque errores;
-- correr `alembic` (migraciones) y `pytest` (tests) desde tu terminal.
+Comprobar que la API llega a la base:
 
 ```bash
-python3 -m venv .venv            # crea el entorno (solo la primera vez)
-source .venv/bin/activate        # lo activa (Linux / macOS / WSL)
-pip install -r requirements.txt  # instala las dependencias
+curl http://localhost:8000/api/v1/health
 ```
 
-> En Windows **sin** WSL (PowerShell) se activa con `.venv\Scripts\Activate.ps1`.
+Tiene que responder `{"status":"ok","database":"ok"}`. También podés abrir http://localhost:8000/api/v1/health en el navegador de Windows.
 
-Cuando el entorno está activo, la terminal muestra `(.venv)` al principio. Hay que activarlo **cada vez que abrís una terminal nueva**. Para salir: `deactivate`.
+Para ver los logs: `docker compose logs web`. Es **normal** que digan `SMTP no configurado` y `FIREBASE_CREDENTIALS no configurado`: son las configuraciones opcionales.
 
-En VS Code: `Ctrl+Shift+P` → *Python: Select Interpreter* → elegir el de `.venv`.
+> **Si falla:**
+> - `web` no aparece o dice `Exited`: mirar `docker compose logs web`.
+> - `port is already allocated`: otro programa usa el puerto 8000 o 5433 (ver Parte E).
+> - `curl` responde `Connection refused`: la app todavía está arrancando; esperar unos segundos y repetir.
+
+**D5. Entorno virtual (`.venv`) e intérprete en VS Code**
+
+La app corre en Docker, pero el `.venv` hace falta para que VS Code autocomplete y marque errores, y para correr los tests y `alembic` desde la terminal.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Si salió bien, el prompt empieza con `(.venv)` y `pip` termina con `Successfully installed ...`. Hay que **activarlo cada vez que abrís una terminal nueva** (`source .venv/bin/activate`); para salir, `deactivate`.
+
+En VS Code: **Ctrl+Shift+P** → **Python: Select Interpreter** → elegir `./.venv/bin/python`. Si no aparece la opción, instalar la extensión **Python** (Microsoft) en *WSL: Ubuntu* (VS Code la sugiere).
+
+> **Si falla:** `ensurepip is not available`: falta `python3-venv` → `sudo apt install -y python3-venv` y repetir. Si `pip install` corta por red, volver a ejecutarlo: retoma donde quedó.
+
+**D6. Crear tu usuario administrador**
+
+Sin un admin nadie puede dar de alta usuarios. Cambiá el DNI (solo números) y el email por los tuyos:
+
+```bash
+docker compose exec -e DEBUG=false web python -m app.scripts.crear_admin --dni 12345678 --email tu@mail.com
+```
+
+Pide la contraseña dos veces (mínimo 8 caracteres; **no se ve al escribirla**). Si salió bien:
+
+```text
+Administrador creado (id=1, dni=12345678, email=tu@mail.com)
+```
+
+`-e DEBUG=false` solo evita que se impriman las consultas SQL. El email es opcional, pero sin email el admin no recibe los correos de avisos.
+
+> **Si falla:** `Ya existe un usuario con DNI ...` (ya lo creaste) · `La contraseña debe tener al menos 8 caracteres` · `Las contraseñas no coinciden` · `Email inválido: ...`. En todos los casos, corregir y volver a ejecutarlo. `service "web" is not running`: volver a D4.
+
+**D7. Cargar datos de prueba**
+
+Carga 2 carreras, 4 materias, 2 docentes, 6 alumnos, 5 cátedras e inscripciones, todos con contraseña `prueba123` y emails `@example.com` (un dominio que nunca entrega correo).
+
+```bash
+docker compose exec -e DEBUG=false web python -m app.scripts.cargar_datos_prueba
+```
+
+Si salió bien, la primera línea dice `Datos de prueba: 33 creados, 0 ya existían` y después una tabla con DNI, rol, nombre y contraseña. Se puede correr varias veces: lo que ya existe se saltea.
+
+**D8. Probar el login en `/docs`**
+
+1. Abrir http://localhost:8000/docs en el navegador.
+2. Botón **Authorize** (arriba a la derecha) → *username*: tu DNI de D6 · *password*: tu contraseña → **Authorize** → **Close**.
+3. Buscar **GET /api/v1/auth/me** → **Try it out** → **Execute**. Tiene que responder `200` con `"rol": "admin"`.
+4. Probar un alumno: **Authorize → Logout**, entrar con `33333331` / `prueba123` y ejecutar **GET /api/v1/alumno/inscripciones**: devuelve 2 inscripciones (Programación I 1K1 y Base de Datos 1K1).
+
+> **Si falla:** `401 Unauthorized` al loguearte: DNI o contraseña incorrectos (la contraseña del `.env` **no** es la del login). `Failed to fetch`: la app no está corriendo (D4).
+
+**D9. Correr los tests**
+
+Los tests corren contra la base de Docker, pero **no dejan datos** (cada test se revierte) y **nunca envían correos ni push reales**.
+
+```bash
+source .venv/bin/activate
+pytest
+```
+
+Si salió bien, termina con `102 passed` (puede agregar `warnings`: son avisos de una librería, no errores). También se pueden correr dentro del contenedor: `docker compose exec web pytest`.
+
+> **Si falla:** `connection refused` → la base no está levantada (`docker compose ps`). `ModuleNotFoundError` → falta activar el `.venv`.
+
+#### Parte E: Problemas comunes en Windows
+
+<details>
+<summary><b><code>docker: command not found</code> (o <code>The command 'docker' could not be found in this WSL 2 distro</code>) en Ubuntu</b></summary>
+
+**Causa:** Docker Desktop no está abierto, o no tiene activada la integración con Ubuntu.
+
+**Solución:** abrir Docker Desktop y esperar a que diga *Engine running*. En **Settings → Resources → WSL Integration**, activar **Ubuntu** → **Apply & restart**. Cerrar y volver a abrir la terminal de Ubuntu.
+</details>
+
+<details>
+<summary><b>Docker Desktop no arranca</b> ("WSL 2 installation is incomplete", "Virtualization support not detected", se queda en "Starting…")</summary>
+
+**Causa:** falta WSL2 o está desactualizado, o la virtualización está apagada.
+
+**Solución:** en PowerShell como administrador, `wsl --update` y después `wsl --shutdown`; reiniciar Docker Desktop. Si dice que no hay virtualización, activarla en la BIOS (ver A1).
+</details>
+
+<details>
+<summary><b><code>localhost:8000</code> no abre en el navegador de Windows</b></summary>
+
+**Causa:** el contenedor `web` no está corriendo, o todavía está arrancando.
+
+**Solución:** en Ubuntu, `docker compose ps` (tiene que decir `web ... Up`) y `docker compose logs web` (buscar errores). Probar `curl http://localhost:8000/api/v1/health` desde Ubuntu: si ahí responde y en Windows no, reiniciar WSL con `wsl --shutdown` en PowerShell y volver a levantar con `docker compose up -d`.
+</details>
+
+<details>
+<summary><b>Los archivos se ven en VS Code pero los comandos no encuentran nada</b> (<code>cp: cannot stat</code>, <code>'source' is not recognized</code>, <code>no configuration file provided</code>)</summary>
+
+**Causa:** la terminal es de **Windows** (PowerShell/CMD), no de Ubuntu, o no estás en la carpeta del proyecto.
+
+**Solución:** abajo a la izquierda de VS Code tiene que decir **WSL: Ubuntu** (si no, **F1 → WSL: Connect to WSL** o `code .` desde Ubuntu). En la terminal, `pwd` tiene que mostrar `/home/tunombre/proyectos/Gestion-asistencia`.
+</details>
+
+<details>
+<summary><b>Todo anda lento o hay errores de permisos</b></summary>
+
+**Causa:** el proyecto está en `/mnt/c/...` (el disco de Windows) en lugar de dentro de Ubuntu.
+
+**Solución:** clonarlo de nuevo en `~/proyectos` (ver D1), copiar el `.env` si ya lo habías configurado, y trabajar siempre desde ahí.
+</details>
+
+<details>
+<summary><b>Errores raros por finales de línea</b> (<code>\r: command not found</code>, valores del <code>.env</code> que no coinciden)</summary>
+
+**Causa:** los archivos tienen finales de línea de Windows (CRLF), por ejemplo porque se clonaron desde Windows o se editaron con un editor que los convierte.
+
+**Solución:** en Ubuntu, `git config --global core.autocrlf input` (C2) y clonar de nuevo dentro de `~/proyectos`. En VS Code, abajo a la derecha tiene que decir **LF** (si dice *CRLF*, clic y elegir *LF*).
+</details>
+
+---
+
+### Linux (Ubuntu / Debian)
+
+Probado en Ubuntu 24.04. Todos los comandos se escriben en la terminal.
+
+**L1. Instalar Git y Python 3.12**
+
+Git descarga el código; Python se usa para el entorno virtual (`.venv`), los tests y generar la clave secreta.
+
+```bash
+sudo apt update
+sudo apt install -y git python3 python3-venv python3-pip curl
+git --version
+python3 --version
+```
+
+Si salió bien: `git version 2.x` y **`Python 3.12.x`** (Ubuntu 24.04).
+
+> **Si falla:** Ubuntu 22.04 trae 3.10 y Debian 12 trae 3.11: ver "No hay Python 3.12" en [Problemas comunes en Linux](#problemas-comunes-en-linux). La app en Docker usa 3.12 igual; esto solo afecta al `.venv`.
+
+**L2. Instalar Docker y Docker Compose**
+
+Docker corre la app y la base de datos en contenedores. El script oficial instala Docker Engine y el plugin `docker compose` en Ubuntu y Debian:
+
+```bash
+curl -fsSL https://get.docker.com | sudo sh
+docker --version
+docker compose version
+```
+
+Si salió bien: `Docker version 2x.x.x` y `Docker Compose version v2.x` o mayor.
+
+> **Si falla:** si preferís los paquetes de la distribución, en Ubuntu: `sudo apt install -y docker.io docker-compose-v2`. Si `docker compose` no existe pero `docker-compose` sí, es la versión 1 (vieja): ver [Problemas comunes en Linux](#problemas-comunes-en-linux).
+
+**L3. Usar Docker sin `sudo`**
+
+Agrega tu usuario al grupo `docker` para no escribir `sudo` en cada comando:
+
+```bash
+sudo usermod -aG docker $USER
+```
+
+**Cerrá sesión y volvé a entrar** (o reiniciá). Después:
+
+```bash
+docker run hello-world
+```
+
+Si salió bien, imprime **Hello from Docker!**
+
+> **Si falla:** `permission denied while trying to connect to the Docker daemon socket`: todavía no cerraste sesión (o probá `newgrp docker` en esa terminal).
+
+**L4. Configurar Git**
+
+```bash
+git config --global user.name "Tu Nombre"
+git config --global user.email "tu@mail.com"
+git config --global --list
+```
+
+Si salió bien, la lista muestra `user.name` y `user.email`.
+
+**L5. Crear la carpeta y clonar**
+
+El proyecto va **dentro de tu carpeta personal** (`~/proyectos`). Si instalaste Docker con **snap**, solo puede montar carpetas de tu `home`: fuera de ahí (por ejemplo en `/tmp`) la app no arranca.
+
+```bash
+mkdir -p ~/proyectos
+cd ~/proyectos
+git clone https://github.com/Andres-M1/Gestion-asistencia.git
+cd Gestion-asistencia
+ls
+```
+
+Si salió bien, `ls` muestra, entre otros: `alembic  app  docker-compose.yml  Dockerfile  README.md  requirements.txt  tests`. Desde acá, **todos los comandos se ejecutan parado en `~/proyectos/Gestion-asistencia`**.
+
+> **Si falla:** `Repository not found` o pide usuario y contraseña: revisá la URL o pedí acceso al repositorio.
+
+**L6. Abrir el proyecto en VS Code (opcional)**
+
+```bash
+code .
+```
+
+Si no tenés VS Code: https://code.visualstudio.com/ (paquete `.deb`). Cualquier editor sirve.
+
+**L7. Crear el `.env` y generar `SECRET_KEY`**
+
+El `.env` tiene la configuración (base de datos, clave de los tokens, correo…). No se sube a git; se crea desde la plantilla `.env.example`. `SECRET_KEY` es **obligatoria**: firma los tokens de login y tiene que ser larga y aleatoria.
+
+```bash
+cp .env.example .env
+sed -i "s|^SECRET_KEY=.*|SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')|" .env
+grep SECRET_KEY .env
+```
+
+Si salió bien, `grep` muestra `SECRET_KEY=` seguido de unos 64 caracteres al azar. El resto de los valores de ejemplo sirven tal cual para desarrollo (ver [Variables de entorno](#variables-de-entorno)).
+
+> **Si falla:** `cp: cannot stat '.env.example'`: no estás en la carpeta del proyecto.
+
+**L8. Levantar la app con Docker**
+
+Construye la imagen de la app, arranca PostgreSQL, crea las tablas (migraciones) y levanta la API.
+
+```bash
+docker compose up -d --build
+docker compose ps
+curl http://localhost:8000/api/v1/health
+```
+
+La primera vez tarda unos minutos. Si salió bien, `docker compose ps` muestra `db ... Up ... (healthy)` y `web ... Up`, con los puertos `5433` y `8000`, y `curl` responde `{"status":"ok","database":"ok"}`.
+
+Los logs (`docker compose logs web`) dicen `SMTP no configurado` y `FIREBASE_CREDENTIALS no configurado`: es **normal**, son las configuraciones opcionales.
+
+> **Si falla:** `web` dice `Exited` → `docker compose logs web`. `port is already allocated` → ver [Problemas comunes en Linux](#problemas-comunes-en-linux). `Connection refused` → esperar unos segundos y repetir.
+
+**L9. Entorno virtual (`.venv`)**
+
+Para que el editor autocomplete y para correr los tests y `alembic` desde la terminal.
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Si salió bien, el prompt empieza con `(.venv)` y `pip` termina con `Successfully installed ...`. Hay que activarlo **cada vez que abrís una terminal nueva**. En VS Code: **Ctrl+Shift+P → Python: Select Interpreter** → `./.venv/bin/python`.
+
+> **Si falla:** `ensurepip is not available` → `sudo apt install -y python3-venv` y repetir.
+
+**L10. Crear tu usuario administrador**
+
+Cambiá el DNI (solo números) y el email por los tuyos:
+
+```bash
+docker compose exec -e DEBUG=false web python -m app.scripts.crear_admin --dni 12345678 --email tu@mail.com
+```
+
+Pide la contraseña dos veces (mínimo 8 caracteres; no se ve al escribirla). Si salió bien: `Administrador creado (id=1, dni=12345678, email=tu@mail.com)`.
+
+> **Si falla:** `Ya existe un usuario con DNI ...` · `La contraseña debe tener al menos 8 caracteres` · `Las contraseñas no coinciden` · `Email inválido: ...`: corregir y repetir.
+
+**L11. Cargar datos de prueba**
+
+```bash
+docker compose exec -e DEBUG=false web python -m app.scripts.cargar_datos_prueba
+```
+
+Si salió bien: `Datos de prueba: 33 creados, 0 ya existían` y la tabla de usuarios (contraseña `prueba123`, emails `@example.com`). Se puede correr varias veces.
+
+**L12. Probar el login en `/docs`**
+
+1. Abrir http://localhost:8000/docs.
+2. **Authorize** → *username*: tu DNI · *password*: tu contraseña → **Authorize** → **Close**.
+3. **GET /api/v1/auth/me** → **Try it out** → **Execute** → `200` con `"rol": "admin"`.
+4. **Logout**, entrar con `33333331` / `prueba123` y ejecutar **GET /api/v1/alumno/inscripciones** → 2 inscripciones.
+
+> **Si falla:** `401` → DNI o contraseña incorrectos (la del `.env` no es la del login).
+
+**L13. Correr los tests**
+
+```bash
+source .venv/bin/activate
+pytest
+```
+
+Si salió bien: `102 passed` (los `warnings` son avisos de una librería, no errores). También: `docker compose exec web pytest`.
+
+#### Problemas comunes en Linux
+
+<details>
+<summary><b><code>docker: 'compose' is not a docker command</code></b></summary>
+
+**Causa:** falta el plugin Compose v2 (tenés el `docker-compose` viejo o ninguno).
+
+**Solución:** `sudo apt install -y docker-compose-v2` (Ubuntu) o reinstalar con `curl -fsSL https://get.docker.com | sudo sh`. Los comandos de esta guía usan `docker compose` (con espacio).
+</details>
+
+<details>
+<summary><b><code>port is already allocated</code> (puerto 8000 o 5433)</b></summary>
+
+**Causa:** otro programa usa ese puerto (otra app FastAPI, un `fastapi dev` del `.venv` o un contenedor viejo).
+
+**Solución:** ver qué lo usa con `sudo lsof -i :8000` (o `:5433`) y cerrarlo; `docker ps` para contenedores viejos (`docker stop <id>`). O cambiar el puerto de tu lado en [docker-compose.yml](docker-compose.yml) (`"8001:8000"`); si cambiás el de la base (`"5434:5432"`), actualizá también `POSTGRES_PORT` en el `.env`.
+</details>
+
+<details>
+<summary><b>No hay Python 3.12</b> (<code>python3 --version</code> muestra 3.10 o 3.11)</summary>
+
+**Causa:** Ubuntu 22.04 trae 3.10 y Debian 12 trae 3.11.
+
+**Solución (Ubuntu 22.04):** `sudo add-apt-repository ppa:deadsnakes/ppa && sudo apt update && sudo apt install -y python3.12 python3.12-venv`, y crear el entorno con `python3.12 -m venv .venv`. En Debian 12 se puede usar 3.11 para el `.venv`, pero no está probado; la app en Docker usa 3.12 igual.
+</details>
+
+<details>
+<summary><b><code>ensurepip is not available</code> al crear el <code>.venv</code></b></summary>
+
+**Causa:** falta el paquete de entornos virtuales.
+
+**Solución:** `sudo apt install -y python3-venv` (o `python3.12-venv`) y repetir `python3 -m venv .venv`.
+</details>
+
+<details>
+<summary><b><code>connection refused</code> al correr <code>pytest</code> o <code>alembic</code> desde tu máquina</b></summary>
+
+**Causa:** la base no está levantada, o el `.env` no apunta a `localhost:5433`.
+
+**Solución:** `docker compose up -d db` y verificar con `docker compose ps` que diga `healthy`. Revisar que el `.env` tenga `POSTGRES_HOST=localhost` y `POSTGRES_PORT=5433`, y ejecutar los comandos desde la raíz del proyecto.
+</details>
+
+<details>
+<summary><b><code>web</code> se cierra con <code>No 'script_location' key found in configuration</code></b></summary>
+
+**Causa:** Docker no puede ver la carpeta del proyecto. Pasa con Docker instalado por **snap** cuando el proyecto está fuera de tu `home` (por ejemplo en `/tmp` o en otro disco).
+
+**Solución:** mover el proyecto a `~/proyectos`, o instalar Docker con el script oficial (L2) en lugar de snap.
+</details>
+
+---
+
+### Opcional: correos con Gmail
+
+> La app **funciona sin esto**: si no se configura, los avisos se crean igual y solo se saltea el envío de correos (con un aviso en el log).
+
+Sirve para que, al registrarse un aviso, les llegue un correo a los alumnos inscriptos y a los preceptores (HU-06).
+
+1. En la cuenta de Google que va a enviar los correos, activar la **verificación en 2 pasos**: https://myaccount.google.com/security.
+2. Crear una **contraseña de aplicación** en https://myaccount.google.com/apppasswords (nombre: "Gestion Asist"). Google muestra 16 caracteres: copiarlos **sin espacios**. Es distinta de la contraseña de la cuenta, que **no** funciona por SMTP.
+3. Completar en el `.env`:
+
+   ```bash
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=cuenta@gmail.com
+   SMTP_PASSWORD=abcdefghijklmnop
+   SMTP_FROM="Gestion Asist <cuenta@gmail.com>"
+   ```
+
+4. Reiniciar para que tome el `.env`: `docker compose down && docker compose up -d`.
+
+Si salió bien, `docker compose logs web` ya **no** dice `SMTP no configurado`. Una cuenta personal de Gmail permite unos 500 destinatarios por día.
+
+> **Si falla:** en los logs, `Username and Password not accepted` → la contraseña de aplicación está mal o se usó la de la cuenta. `No se pudo usar el servidor SMTP` → revisar `SMTP_HOST` y `SMTP_PORT`.
+
+### Opcional: push con Firebase
+
+> La app **funciona sin esto**: si no se configura, los avisos se crean igual y solo se saltea el envío de push (con un aviso en el log).
+
+Sirve para enviar notificaciones push a la app Android de los alumnos (HU-06).
+
+1. En https://console.firebase.google.com abrir el proyecto (el **mismo** que usa la app Android).
+2. ⚙️ **Configuración del proyecto** → **Cuentas de servicio** → **Generar nueva clave privada**. Se descarga un JSON.
+3. Guardarlo como `secrets/firebase.json` dentro del proyecto (desde Windows/WSL, se puede arrastrar al panel de archivos de VS Code). La carpeta `secrets/` está en `.gitignore` y `.dockerignore`: **ese archivo nunca se sube a git**. Si alguna vez se filtra, revocar la clave desde la misma pantalla.
+4. En el `.env`: `FIREBASE_CREDENTIALS=secrets/firebase.json` (ruta relativa a la raíz del proyecto; funciona igual dentro del contenedor).
+5. Reiniciar: `docker compose down && docker compose up -d`.
+
+Si salió bien, `docker compose logs web` ya **no** dice `FIREBASE_CREDENTIALS no configurado`.
+
+> **Si falla:** `No se pudo iniciar Firebase con secrets/firebase.json` en los logs → el archivo no está en esa ruta o no es el JSON del service account.
 
 ### Alternativa: app local + base en Docker
 
@@ -223,9 +739,23 @@ alembic upgrade head             # crea las tablas
 fastapi dev app/main.py          # app en http://localhost:8000
 ```
 
-No levantes al mismo tiempo el contenedor `web`, porque los dos usan el puerto 8000.
+No levantes al mismo tiempo el contenedor `web` (`docker compose stop web`), porque los dos usan el puerto 8000.
+
+### ¿Quedó todo bien?
+
+| # | Comprobación | Comando o dónde | Resultado esperado |
+|---|--------------|-----------------|--------------------|
+| 1 | Los dos contenedores corren | `docker compose ps` | `db ... (healthy)` y `web ... Up` |
+| 2 | La API llega a la base | http://localhost:8000/api/v1/health | `{"status":"ok","database":"ok"}` |
+| 3 | Las tablas están al día | `source .venv/bin/activate && alembic current` | Una línea que termina en `(head)` |
+| 4 | Tu admin entra | `/docs` → Authorize → `GET /api/v1/auth/me` | `200` con `"rol": "admin"` |
+| 5 | Los datos de prueba están | `/docs` con `33333331` / `prueba123` → `GET /api/v1/alumno/inscripciones` | 2 inscripciones |
+| 6 | Los tests pasan | `pytest` (con el `.venv` activo) | `102 passed` |
+
+Si las 6 dan bien, el proyecto está listo. Para apagarlo: `docker compose down` (los datos se conservan). Para volver a levantarlo: `docker compose up -d`.
 
 ---
+
 
 ## Variables de entorno
 
@@ -240,15 +770,15 @@ Se definen en `.env` (plantilla: [.env.example](.env.example)) y las lee [app/co
 | `POSTGRES_DB`       | `gestion_asist`  | Nombre de la base de datos.                                              |
 | `POSTGRES_HOST`     | `localhost`      | Dónde está la base **vista desde tu máquina**.                           |
 | `POSTGRES_PORT`     | `5433`           | Puerto de la base **visto desde tu máquina**.                            |
-| `SECRET_KEY`        | (aleatoria)      | Clave para firmar los tokens de login. Generarla con `python -c "import secrets; print(secrets.token_urlsafe(48))"`. |
+| `SECRET_KEY`        | (aleatoria)      | **Obligatoria**: sin ella la app no arranca. Firma los tokens de login. Generarla con `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` (ver paso D3 / L7). |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `480`  | Duración del token de login.                                             |
 | `CORS_ORIGINS`      | `http://localhost:5173` | Orígenes del frontend web permitidos, separados por coma.         |
 | `SMTP_HOST`         | `smtp.gmail.com` | Servidor de correo (HU-06). **Vacío = no se envían correos.**            |
 | `SMTP_PORT`         | `587`            | Puerto SMTP (con STARTTLS).                                              |
 | `SMTP_USER`         | `cuenta@gmail.com` | Usuario SMTP.                                                          |
-| `SMTP_PASSWORD`     | (contraseña de aplicación) | Ver [Configurar Gmail](#configurar-gmail).                     |
+| `SMTP_PASSWORD`     | (contraseña de aplicación) | Ver [Opcional: correos con Gmail](#opcional-correos-con-gmail).                     |
 | `SMTP_FROM`         | `Gestion Asist <cuenta@gmail.com>` | Remitente. Vacío = `SMTP_USER`.                        |
-| `FIREBASE_CREDENTIALS` | `secrets/firebase.json` | Ruta al JSON del service account (HU-06). **Vacío = no se envían push.** Ver [Configurar Firebase](#configurar-firebase). |
+| `FIREBASE_CREDENTIALS` | `secrets/firebase.json` | Ruta al JSON del service account (HU-06). **Vacío = no se envían push.** Ver [Opcional: push con Firebase](#opcional-push-con-firebase). |
 
 ### ¿Por qué `localhost:5433` y no `5432`?
 
@@ -456,7 +986,7 @@ Los listados aceptan `?offset=0&limit=100` (`limit` máximo: 100). Errores comun
 Sin un admin nadie puede dar de alta usuarios. La contraseña se pide por teclado. El email es opcional (si no se pasa `--email`, se pide por teclado y se puede dejar vacío), pero **sin email el preceptor no recibe los correos de avisos** (HU-06):
 
 ```bash
-docker compose exec web python -m app.scripts.crear_admin --dni 12345678 --email preceptor@instituto.edu.ar
+docker compose exec -e DEBUG=false web python -m app.scripts.crear_admin --dni 12345678 --email preceptor@instituto.edu.ar
 ```
 
 Para cargarle el email a un admin **que ya existe**, sin borrarlo (cambiar el DNI y el email):
@@ -473,7 +1003,7 @@ Tiene que responder `UPDATE 1`. Si dice `UPDATE 0`, ese DNI no existe o no es ad
 Herramienta de desarrollo: carga un preceptor, 2 carreras, 4 materias, 2 docentes, 6 alumnos, 5 cátedras e inscripciones (una con `vigente=false`). Todos con contraseña `prueba123`; al terminar imprime la tabla de usuarios.
 
 ```bash
-docker compose exec web python -m app.scripts.cargar_datos_prueba
+docker compose exec -e DEBUG=false web python -m app.scripts.cargar_datos_prueba
 ```
 
 Se puede correr varias veces: lo que ya existe (por DNI, nombre, materia + comisión, etc.) se saltea sin modificarlo. No crea avisos. Los datos quedan en la base de desarrollo; para borrarlos, empezar de cero con `docker compose down -v`.
@@ -495,31 +1025,7 @@ Cuando un docente registra un aviso (`POST /docente/avisos`), la API responde en
 
 **App Android:** después del login y en `onNewToken`, llamar a `PUT /api/v1/auth/me/fcm-token` con `{"token": "<token de FCM>"}`. Al cerrar sesión, `DELETE /api/v1/auth/me/fcm-token`. Un celular por usuario.
 
-#### Configurar Gmail
-
-1. En la cuenta de Google que va a enviar los correos, activar la **verificación en 2 pasos** (https://myaccount.google.com/security).
-2. Crear una **contraseña de aplicación** en https://myaccount.google.com/apppasswords (nombre: "Gestion Asist"). Google muestra 16 caracteres: copiarlos **sin espacios**. Es distinta de la contraseña de la cuenta, que no funciona por SMTP.
-3. En el `.env`:
-
-   ```bash
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_USER=cuenta@gmail.com
-   SMTP_PASSWORD=abcdefghijklmnop
-   SMTP_FROM="Gestion Asist <cuenta@gmail.com>"
-   ```
-
-4. Reiniciar: `docker compose down && docker compose up -d`. En los logs ya no debe aparecer "SMTP no configurado".
-
-Una cuenta personal de Gmail permite unos 500 destinatarios por día.
-
-#### Configurar Firebase
-
-1. En https://console.firebase.google.com abrir el proyecto (el **mismo** que usa la app Android).
-2. ⚙️ **Configuración del proyecto** → **Cuentas de servicio** → **Generar nueva clave privada**. Se descarga un JSON.
-3. Guardarlo como `secrets/firebase.json` dentro del proyecto. La carpeta `secrets/` está en `.gitignore` y `.dockerignore`: **ese archivo nunca se sube a git**. Si alguna vez se filtra, revocar la clave desde la misma pantalla.
-4. En el `.env`: `FIREBASE_CREDENTIALS=secrets/firebase.json` (la ruta es relativa a la raíz del proyecto; funciona igual dentro del contenedor).
-5. Reiniciar: `docker compose down && docker compose up -d`.
+Para activar los envíos reales: [Opcional: correos con Gmail](#opcional-correos-con-gmail) y [Opcional: push con Firebase](#opcional-push-con-firebase).
 
 ### Probar HU-02 en `/docs`
 
@@ -794,6 +1300,8 @@ Dentro de `psql`: `\dt` lista las tablas, `\d carrera` muestra una tabla, `\q` s
 
 ## Solución de problemas
 
+Los problemas de instalación están en cada sistema: [Windows](#parte-e-problemas-comunes-en-windows) · [Linux](#problemas-comunes-en-linux).
+
 <details>
 <summary><b><code>permission denied while trying to connect to the Docker daemon socket</code></b></summary>
 
@@ -807,16 +1315,6 @@ Después **cerrá sesión y volvé a entrar** (o ejecutá `newgrp docker` en esa
 </details>
 
 <details>
-<summary><b><code>Bind for 0.0.0.0:8000 failed: port is already allocated</code> (o 5433)</b></summary>
-
-Otro programa ya usa ese puerto (muchas veces, otra app FastAPI corriendo o un contenedor viejo). Opciones:
-
-- Ver qué lo usa: `sudo lsof -i :8000` y cerrarlo.
-- Ver si hay contenedores viejos: `docker ps` y detenerlos con `docker stop <id>`.
-- O cambiar el puerto de tu lado en [docker-compose.yml](docker-compose.yml): por ejemplo `"8001:8000"` y entrar por http://localhost:8001. Si cambiás el de la base (`"5434:5432"`), actualizá también `POSTGRES_PORT` en el `.env`.
-</details>
-
-<details>
 <summary><b><code>password authentication failed for user ...</code></b></summary>
 
 Cambiaste usuario o contraseña en el `.env` después de que la base ya se había creado. PostgreSQL solo los toma la primera vez. Para recrear la base con los valores nuevos (**se borran todos los datos**):
@@ -825,16 +1323,6 @@ Cambiaste usuario o contraseña en el `.env` después de que la base ya se habí
 docker compose down -v
 docker compose up --build
 ```
-</details>
-
-<details>
-<summary><b><code>connection refused</code> al correr <code>alembic</code> o <code>pytest</code> desde tu máquina</b></summary>
-
-La base no está levantada, o el `.env` no apunta a `localhost:5433`.
-
-- Levantá la base: `docker compose up -d db` y verificá con `docker compose ps` que diga `healthy`.
-- Revisá que en el `.env` estén `POSTGRES_HOST=localhost` y `POSTGRES_PORT=5433`.
-- Ejecutá los comandos **desde la carpeta raíz del proyecto** (ahí es donde se busca el `.env`).
 </details>
 
 <details>
@@ -852,6 +1340,16 @@ Alembic no ve el modelo nuevo. Verificá que lo importaste en [app/models/__init
 </details>
 
 <details>
+<summary><b><code>Permiso denegado</code> al borrar carpetas <code>__pycache__</code></b></summary>
+
+El contenedor corre como `root` y, como el proyecto está montado dentro de él, Python deja ahí sus `__pycache__` con dueño `root`. Son descartables (git los ignora). Para borrarlos sin `sudo`, desde el mismo contenedor:
+
+```bash
+docker compose exec web find . -path ./.venv -prune -o -name __pycache__ -type d -exec rm -rf {} +
+```
+</details>
+
+<details>
 <summary><b>No puedo editar archivos de migración: <code>Permission denied</code></b></summary>
 
 Se generaron dentro del contenedor y quedaron con dueño `root`. Recuperá la propiedad:
@@ -861,16 +1359,6 @@ sudo chown -R $USER:$USER alembic/versions
 ```
 
 Y de ahora en más generá las migraciones desde tu máquina con el `.venv`.
-</details>
-
-<details>
-<summary><b><code>python3 -m venv .venv</code> falla con <code>ensurepip is not available</code></b></summary>
-
-En Ubuntu/Debian falta el paquete de entornos virtuales:
-
-```bash
-sudo apt install python3-venv
-```
 </details>
 
 <details>
