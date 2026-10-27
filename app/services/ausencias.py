@@ -1,4 +1,4 @@
-"""Reglas de negocio de los avisos de ausencia (HU-02, HU-03, HU-05).
+"""Reglas de negocio de los avisos de ausencia (HU-02, HU-03, HU-05, HU-09).
 
 Una clase = una cátedra en una fecha concreta. El docente puede avisar sobre una clase si:
   - la cátedra es suya;
@@ -11,6 +11,7 @@ Todo se compara en hora de Argentina, nunca con la hora del servidor (UTC).
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -20,6 +21,7 @@ from app.models.catedra import Catedra
 from app.models.alumno import Alumno
 from app.models.docente import Docente
 from app.models.inscripcion import Inscripcion
+from app.models.materia import Materia
 from app.schemas.ausencia import AvisoDetalle, ClaseDisponible, DocenteResumen
 
 ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
@@ -129,6 +131,11 @@ def a_detalle(aviso: Ausencia) -> AvisoDetalle:
     )
 
 
+# Del más nuevo al más viejo (HU-03 y HU-09). El desempate por hora de inicio e id
+# hace que el orden sea siempre el mismo, así la paginación no repite ni saltea avisos.
+_MAS_NUEVOS_PRIMERO = (Ausencia.fecha.desc(), Catedra.hora_inicio.desc(), Ausencia.id.desc())
+
+
 def _con_detalle(consulta):
     """Carga cátedra, materia y docente de cada aviso en 3 consultas en total, no una por aviso."""
     return consulta.options(
@@ -137,16 +144,12 @@ def _con_detalle(consulta):
 
 
 def avisos_del_docente(session: Session, docente: Docente, offset: int = 0, limit: int = 100) -> list[AvisoDetalle]:
-    """Historial de avisos del docente (HU-03), pasados y futuros, del más nuevo al más viejo.
-
-    El desempate por hora de inicio e id hace que el orden sea siempre el mismo,
-    así la paginación no repite ni saltea avisos.
-    """
+    """Historial de avisos del docente (HU-03), pasados y futuros, del más nuevo al más viejo."""
     consulta = (
         select(Ausencia)
         .join(Catedra)
         .where(Catedra.docente_id == docente.id)
-        .order_by(Ausencia.fecha.desc(), Catedra.hora_inicio.desc(), Ausencia.id.desc())
+        .order_by(*_MAS_NUEVOS_PRIMERO)
         .offset(offset)
         .limit(limit)
     )
@@ -177,6 +180,48 @@ def avisos_del_alumno(
         .join(Catedra)
         .where(de_sus_catedras, Ausencia.fecha >= _ahora_argentina().date())
         .order_by(Ausencia.fecha, Catedra.hora_inicio, Ausencia.id)
+        .offset(offset)
+        .limit(limit)
+    )
+    return [a_detalle(aviso) for aviso in session.exec(_con_detalle(consulta))]
+
+
+def avisos_filtrados(
+    session: Session,
+    *,
+    carrera_id: int | None = None,
+    materia_id: int | None = None,
+    comision: str | None = None,
+    docente_id: int | None = None,
+    fecha_desde: date | None = None,
+    fecha_hasta: date | None = None,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[AvisoDetalle]:
+    """Todos los avisos, pasados y futuros, con filtros opcionales combinables (HU-09).
+
+    comision se compara sin distinguir mayúsculas ("1k1" = "1K1"). Las fechas incluyen los extremos.
+    """
+    filtros = []
+    if carrera_id is not None:
+        filtros.append(Materia.carrera_id == carrera_id)
+    if materia_id is not None:
+        filtros.append(Catedra.materia_id == materia_id)
+    if comision is not None:
+        filtros.append(func.lower(Catedra.comision) == comision.lower())
+    if docente_id is not None:
+        filtros.append(Catedra.docente_id == docente_id)
+    if fecha_desde is not None:
+        filtros.append(Ausencia.fecha >= fecha_desde)
+    if fecha_hasta is not None:
+        filtros.append(Ausencia.fecha <= fecha_hasta)
+
+    consulta = (
+        select(Ausencia)
+        .join(Catedra)
+        .join(Materia)
+        .where(*filtros)
+        .order_by(*_MAS_NUEVOS_PRIMERO)
         .offset(offset)
         .limit(limit)
     )

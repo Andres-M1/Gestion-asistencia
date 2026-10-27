@@ -38,7 +38,7 @@ Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre e
 | HU-06  | Estudiante / Preceptor | Notificación push + correo al registrarse un aviso | ⏳ |
 | HU-07  | Estudiante | Ver sus inscripciones vigentes y sus avisos                | ✅ `GET /alumno/inscripciones` |
 | HU-08  | Admin      | Alta de docentes y estudiantes                             | ✅ `/docentes`, `/alumnos` |
-| HU-09  | Admin      | Listar avisos con filtros                                  | ⏳ |
+| HU-09  | Admin      | Listar avisos con filtros                                  | ✅ `GET /admin/avisos` |
 | HU-10  | Admin      | Asignar docentes a materias (cátedras)                     | ✅ `/catedras` |
 
 Además: CRUD de administrador para carreras, materias e inscripciones (necesarios para cargar los datos).
@@ -418,9 +418,22 @@ Todo se calcula en **hora de Argentina** (`America/Argentina/Buenos_Aires`), aun
 
 **Probar en `/docs`** con los [datos de prueba](#cargar-datos-de-prueba): loguearse como `33333331` / `prueba123`. Tiene 2 inscripciones vigentes (Programación I 1K1 y Base de Datos 1K1) y una no vigente (Programación I 1K2). Desde un docente (`22222222` o `22222223`) registrar un aviso y verlo desde el alumno.
 
-### Administrador (HU-08, HU-10)
+### Administrador (HU-08, HU-09, HU-10)
 
 Todas piden rol `admin`.
+
+**Avisos (HU-09):** `GET /api/v1/admin/avisos` lista **todos** los avisos, pasados y futuros, del más nuevo al más viejo (mismo orden que HU-03). Devuelve `AvisoDetalle` y se pagina con `?offset=&limit=`. Filtros opcionales, combinables entre sí:
+
+| Filtro        | Qué hace |
+|---------------|----------|
+| `carrera_id`  | Avisos de materias de esa carrera |
+| `materia_id`  | Avisos de esa materia |
+| `comision`    | Texto exacto, **sin distinguir mayúsculas** (`1k1` = `1K1`). Solo, trae esa comisión en todas las materias |
+| `docente_id`  | Avisos de ese docente |
+| `fecha_desde` / `fecha_hasta` | Rango de fechas, **incluyendo los extremos** (`AAAA-MM-DD`) |
+
+Respuestas: `200` · `403` no es admin · `422` si `fecha_desde` es posterior a `fecha_hasta`. Un id que no existe devuelve una lista vacía (es un filtro, no un 404).
+
 
 | Recurso                  | Rutas                                         | Notas |
 |--------------------------|-----------------------------------------------|-------|

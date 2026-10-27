@@ -28,7 +28,7 @@ Implementar **solo** estas historias de usuario. No agregar funcionalidades, rol
 | HU-06 | Estudiante / Preceptor | Al registrarse un aviso: cada alumno con inscripción vigente en esa cátedra recibe **push + correo**; los preceptores reciben **correo** | ⏳ |
 | HU-07 | Estudiante | Ver sus inscripciones vigentes (materia, comisión, docente) y desde cada una sus avisos | ✅ hecho (`GET /alumno/inscripciones`; avisos por cátedra con `GET /alumno/avisos?catedra_id=`) |
 | HU-08 | Admin | Alta de docentes y estudiantes con DNI y contraseña | ✅ hecho |
-| HU-09 | Admin | Listar avisos filtrando por carrera, materia, comisión, docente y fecha | ⏳ |
+| HU-09 | Admin | Listar avisos filtrando por carrera, materia, comisión, docente y fecha | ✅ hecho (`GET /admin/avisos`) |
 | HU-10 | Admin | Asignar docentes a materias (= crear/editar cátedras) | ✅ hecho |
 
 Carreras, materias e inscripciones tienen CRUD de admin porque son necesarios para cargar los datos. No ampliarlos.
