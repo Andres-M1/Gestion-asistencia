@@ -1,11 +1,11 @@
-"""Endpoints del docente: /api/v1/docente (HU-02)."""
-from fastapi import APIRouter, HTTPException, status
+"""Endpoints del docente: /api/v1/docente (HU-02, HU-03)."""
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.api.deps import DocenteUser, SessionDep
 from app.api.errores import manejar_integridad
 from app.models.docente import Docente
 from app.models.usuario import Usuario
-from app.schemas.ausencia import AvisoCreate, AvisoRead, ClaseDisponible
+from app.schemas.ausencia import AvisoCreate, AvisoDetalle, ClaseDisponible
 from app.services import ausencias
 
 router = APIRouter(prefix="/docente")
@@ -24,14 +24,26 @@ def clases_disponibles(usuario: DocenteUser, session: SessionDep):
     return ausencias.clases_disponibles(session, _perfil(usuario))
 
 
-@router.post("/avisos", response_model=AvisoRead, status_code=status.HTTP_201_CREATED)
+@router.post("/avisos", response_model=AvisoDetalle, status_code=status.HTTP_201_CREATED)
 def registrar_aviso(data: AvisoCreate, usuario: DocenteUser, session: SessionDep):
     """Registra el aviso de que el docente no va a dar la clase (cátedra + fecha)."""
     docente = _perfil(usuario)
     try:
         with manejar_integridad(session):
-            return ausencias.registrar_aviso(session, docente, data.catedra_id, data.fecha)
+            aviso = ausencias.registrar_aviso(session, docente, data.catedra_id, data.fecha)
     except ausencias.CatedraNoEncontrada:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Cátedra no encontrada")
     except ausencias.AvisoInvalido as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
+    return ausencias.a_detalle(aviso)
+
+
+@router.get("/avisos", response_model=list[AvisoDetalle])
+def mis_avisos(
+    usuario: DocenteUser,
+    session: SessionDep,
+    offset: int = 0,
+    limit: int = Query(default=100, le=100),
+):
+    """Historial de avisos del docente logueado, pasados y futuros, ordenados por fecha descendente."""
+    return ausencias.avisos_del_docente(session, _perfil(usuario), offset, limit)

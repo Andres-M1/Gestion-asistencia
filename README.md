@@ -32,7 +32,7 @@ Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre e
 |--------|------------|------------------------------------------------------------|--------|
 | HU-01  | Todos      | Login con DNI y contraseña                                 | ✅ `/auth/login`, `/auth/me` |
 | HU-02  | Docente    | Registrar aviso eligiendo una clase concreta de una lista  | ✅ `/docente/clases-disponibles`, `/docente/avisos` |
-| HU-03  | Docente    | Ver el historial de sus avisos                             | ⏳ |
+| HU-03  | Docente    | Ver el historial de sus avisos                             | ✅ `GET /docente/avisos` |
 | ~~HU-04~~ | —       | Cancelar aviso: **descartada** (un aviso no se cancela ni se edita) | ❌ |
 | HU-05  | Estudiante | Ver avisos de cátedras donde tiene inscripción vigente     | ⏳ |
 | HU-06  | Estudiante / Preceptor | Notificación push + correo al registrarse un aviso | ⏳ |
@@ -375,12 +375,13 @@ Salvo `/health` y `/auth/login`, **todas las rutas piden un token**. En `/docs`:
 | POST   | `/api/v1/auth/login`  | Todos   | Recibe `{dni, password}` y devuelve el token. | `200` · `401` DNI o contraseña incorrectos |
 | GET    | `/api/v1/auth/me`     | Logueado | Datos del usuario, su rol y su perfil.       | `200` · `401` |
 
-### Docente (HU-02)
+### Docente (HU-02, HU-03)
 
 | Método | Ruta                                   | Qué hace | Respuestas |
 |--------|----------------------------------------|----------|------------|
 | GET    | `/api/v1/docente/clases-disponibles`   | Próximas clases del docente sobre las que puede avisar. | `200` · `403` no es docente |
-| POST   | `/api/v1/docente/avisos`               | Registra un aviso con `{catedra_id, fecha}`. Queda en estado `activo`. | `201` · `404` cátedra inexistente o ajena · `409` ya hay aviso · `422` no cumple las reglas |
+| POST   | `/api/v1/docente/avisos`               | Registra un aviso con `{catedra_id, fecha}`. Queda en estado `activo`. Devuelve el `AvisoDetalle`. | `201` · `404` cátedra inexistente o ajena · `409` ya hay aviso · `422` no cumple las reglas |
+| GET    | `/api/v1/docente/avisos`               | Historial de avisos del docente (pasados y futuros), por fecha descendente. Paginado con `?offset=&limit=`. | `200` · `403` no es docente |
 
 Una clase aparece en la lista (y el `POST` la acepta) solo si:
 
@@ -389,6 +390,18 @@ Una clase aparece en la lista (y el `POST` la acepta) solo si:
 - faltan **al menos 1 hora** para su inicio;
 - empieza dentro de los **próximos 7 días**;
 - no tiene ya un aviso.
+
+Cada aviso se devuelve como **`AvisoDetalle`** (lo reusan HU-05 y HU-09). No incluye `estado`: un aviso registrado siempre está activo.
+
+```json
+{
+  "id": 12, "fecha": "2026-11-03",
+  "materia": "Programación I", "comision": "1K1",
+  "dia_semana": 2, "hora_inicio": "18:00:00", "hora_fin": "20:00:00",
+  "docente": {"nombre": "Laura", "apellido": "Gómez"},
+  "creado_en": "2026-10-28T14:05:00Z"
+}
+```
 
 Todo se calcula en **hora de Argentina** (`America/Argentina/Buenos_Aires`), aunque el contenedor esté en UTC. El `POST` vuelve a validar todo en el servidor: no confía en que el cliente mandó una opción de la lista. La lógica está en [app/services/ausencias.py](app/services/ausencias.py).
 
@@ -431,6 +444,7 @@ Se puede correr varias veces: lo que ya existe (por DNI, nombre, materia + comis
 2. **Logout** en Authorize y volver a loguearse con el DNI y la contraseña del docente.
 3. `GET /docente/clases-disponibles` → copiar `catedra_id` y `fecha` de una opción.
 4. `POST /docente/avisos` con esos datos → `201`. Repetirlo → `409`. Volver a listar: esa clase ya no aparece.
+5. `GET /docente/avisos` (HU-03) → el aviso recién creado aparece primero si es el de fecha más lejana. Con los [datos de prueba](#cargar-datos-de-prueba), entrar como `22222222` o `22222223`.
 
 ---
 

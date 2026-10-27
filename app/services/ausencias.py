@@ -1,4 +1,4 @@
-"""Reglas de negocio de los avisos de ausencia (HU-02).
+"""Reglas de negocio de los avisos de ausencia (HU-02, HU-03).
 
 Una clase = una cátedra en una fecha concreta. El docente puede avisar sobre una clase si:
   - la cátedra es suya;
@@ -11,13 +11,14 @@ Todo se compara en hora de Argentina, nunca con la hora del servidor (UTC).
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
 from app.crud import base as crud
 from app.models.ausencia import Ausencia
 from app.models.catedra import Catedra
 from app.models.docente import Docente
-from app.schemas.ausencia import ClaseDisponible
+from app.schemas.ausencia import AvisoDetalle, ClaseDisponible, DocenteResumen
 
 ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 ANTICIPACION_MINIMA = timedelta(hours=1)
@@ -104,3 +105,38 @@ def registrar_aviso(session: Session, docente: Docente, catedra_id: int, fecha: 
         raise AvisoInvalido("Solo se puede avisar sobre clases de los próximos 7 días")
 
     return crud.crear(session, Ausencia(catedra_id=catedra.id, fecha=fecha))
+
+
+def a_detalle(aviso: Ausencia) -> AvisoDetalle:
+    """Arma la respuesta de un aviso con los datos de su clase."""
+    catedra = aviso.catedra
+    return AvisoDetalle(
+        id=aviso.id,
+        fecha=aviso.fecha,
+        materia=catedra.materia.nombre,
+        comision=catedra.comision,
+        dia_semana=catedra.dia_semana,
+        hora_inicio=catedra.hora_inicio,
+        hora_fin=catedra.hora_fin,
+        docente=DocenteResumen(nombre=catedra.docente.nombre, apellido=catedra.docente.apellido),
+        creado_en=aviso.creado_en,
+    )
+
+
+def avisos_del_docente(session: Session, docente: Docente, offset: int = 0, limit: int = 100) -> list[AvisoDetalle]:
+    """Historial de avisos del docente (HU-03), pasados y futuros, del más nuevo al más viejo.
+
+    El desempate por hora de inicio e id hace que el orden sea siempre el mismo,
+    así la paginación no repite ni saltea avisos.
+    """
+    consulta = (
+        select(Ausencia)
+        .join(Catedra)
+        .where(Catedra.docente_id == docente.id)
+        # Carga cátedra, materia y docente en 3 consultas en total, no una por aviso
+        .options(selectinload(Ausencia.catedra).options(selectinload(Catedra.materia), selectinload(Catedra.docente)))
+        .order_by(Ausencia.fecha.desc(), Catedra.hora_inicio.desc(), Ausencia.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    return [a_detalle(aviso) for aviso in session.exec(consulta)]

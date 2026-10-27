@@ -21,8 +21,8 @@ Implementar **solo** estas historias de usuario. No agregar funcionalidades, rol
 | HU | Rol | Qué | Estado |
 |----|-----|-----|--------|
 | HU-01 | Todos | Login con DNI y contraseña | ✅ hecho (`/auth/login`, `/auth/me`) |
-| HU-02 | Docente | Registrar aviso eligiendo **una clase concreta** de una lista (ver reglas abajo). No elige fecha libre ni escribe motivo. | ⏳ |
-| HU-03 | Docente | Ver el historial de sus avisos | ⏳ |
+| HU-02 | Docente | Registrar aviso eligiendo **una clase concreta** de una lista (ver reglas abajo). No elige fecha libre ni escribe motivo. | ✅ hecho (`/docente/clases-disponibles`, `POST /docente/avisos`) |
+| HU-03 | Docente | Ver el historial de sus avisos | ✅ hecho (`GET /docente/avisos`) |
 | ~~HU-04~~ | — | **Descartada.** Un aviso registrado no se cancela ni se edita. | ❌ |
 | HU-05 | Estudiante | Ver avisos solo de cátedras donde tiene inscripción vigente | ⏳ |
 | HU-06 | Estudiante / Preceptor | Al registrarse un aviso: cada alumno con inscripción vigente en esa cátedra recibe **push + correo**; los preceptores reciben **correo** | ⏳ |

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 import pytest
 
+from app.models.ausencia import Ausencia, EstadoAusencia
 from app.services import ausencias
 from tests.conftest import auth
 
@@ -89,14 +90,17 @@ def test_docente_sin_catedras_recibe_lista_vacia(client, datos, session):
 
 # --- Registrar aviso ---------------------------------------------------------------
 
-def test_registra_aviso_en_estado_activo(client, datos):
+def test_registra_aviso_en_estado_activo_y_devuelve_el_detalle(client, datos, session):
     r = avisar(client, datos["u_doc_a"], datos["martes_a"], "2026-11-03")
     assert r.status_code == 201, r.text
     cuerpo = r.json()
-    assert cuerpo["catedra_id"] == datos["martes_a"].id
-    assert cuerpo["fecha"] == "2026-11-03"
-    assert cuerpo["estado"] == "activo"
-    assert "motivo" not in cuerpo
+    assert cuerpo.pop("creado_en")
+    assert cuerpo == {
+        "id": cuerpo["id"], "fecha": "2026-11-03", "materia": "Programación II", "comision": "1K1",
+        "dia_semana": 2, "hora_inicio": "18:00:00", "hora_fin": "20:00:00",
+        "docente": {"nombre": "Doc", "apellido": "80000001"},
+    }
+    assert session.get(Ausencia, cuerpo["id"]).estado == EstadoAusencia.activo
 
 
 def test_no_permite_dos_avisos_para_la_misma_clase(client, datos):
