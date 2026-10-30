@@ -63,6 +63,7 @@ Documentación del proyecto en [`docs/`](docs/), armada a partir del código:
 | [API](docs/api.md) | Contrato para la app Android y la web: endpoints por cliente, ejemplos de request y response, y errores. |
 | [Reglas de negocio](docs/reglas-de-negocio.md) | Avisos, notificaciones, zona horaria y usuarios. |
 | [Decisiones de diseño](docs/decisiones.md) | Decisiones funcionales y técnicas, con su motivo. |
+| [Testing](docs/testing.md) | Cómo correr los tests, ver la cobertura, correr los e2e y leer los resultados en GitHub Actions. |
 
 ---
 
@@ -1258,6 +1259,8 @@ docker compose exec web pytest
 ```
 
 Opciones útiles: `pytest -v` (muestra cada test), `pytest tests/test_main.py` (un solo archivo), `pytest -k nombre` (los tests que contengan "nombre").
+
+`pytest` muestra además la **cobertura** de `app/`. Los tests **end-to-end** contra la API levantada se corren con `tests/e2e/correr.sh`. Todo está explicado en la [guía de testing](docs/testing.md).
 
 Los tests corren contra la base de Docker (`localhost:5433`), así que necesitan el contenedor `db` levantado, pero **no dejan datos**: cada test se ejecuta dentro de una transacción que se revierte al terminar. Con `join_transaction_mode="create_savepoint"`, los `commit()` de los services solo cierran un savepoint.
 
