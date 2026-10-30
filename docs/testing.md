@@ -8,7 +8,7 @@ Cómo correr los tests de la API, ver la cobertura y leer los resultados en GitH
 |------|-------|-----------|------------|
 | **Tests de la API** | `tests/test_*.py` | Cada HU con sus criterios de aceptación: reglas de avisos, permisos, notificaciones (con SMTP y Firebase falsos) y errores. | Dentro del proceso, con `TestClient`, contra la base de Docker. Cada test se revierte al terminar: **no deja datos**. |
 | **End-to-end (e2e)** | `tests/e2e/` | El flujo completo por HTTP, como lo usan la app y la web: login, registrar un aviso, quién lo ve y los errores 401/403/404/422. | Contra una API **levantada aparte** (proyecto de Docker `gestion_asist_e2e`, puerto 8001), con base limpia y sin SMTP ni Firebase. |
-| **Cobertura** | — | Qué líneas de `app/` ejecutan los tests de la API. | Sale sola al final de cada `pytest`. |
+| **Cobertura** | — | Qué líneas de `app/` ejecutan los tests de la API. No cuenta `app/scripts/`: son herramientas de desarrollo (ver `.coveragerc`). | Sale sola al final de cada `pytest`. |
 
 `pytest` corre solo los tests de la API. Los e2e están marcados con `e2e` y se corren con su script.
 
@@ -36,8 +36,8 @@ También se puede dentro del contenedor: `docker compose exec web pytest`. Si sa
 ```
 app/services/ausencias.py                  89      1    99%   46
 ...
-TOTAL                                    1165    257    78%
-============== 104 passed, 29 deselected, 189 warnings in 23.64s ===============
+TOTAL                                    1009     20    98%
+============== 203 passed, 29 deselected, 356 warnings in 44.15s ===============
 ```
 
 - `29 deselected` son los e2e: es normal.

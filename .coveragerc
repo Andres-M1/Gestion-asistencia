@@ -1,0 +1,5 @@
+# Configuración de la cobertura (pytest-cov la lee sola).
+[run]
+# Herramientas de desarrollo: no son parte de la API (el e2e ya las ejecuta)
+omit =
+    app/scripts/*
