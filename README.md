@@ -1,5 +1,7 @@
 # Gestion Asist
 
+[![Tests](https://github.com/Andres-M1/Gestion-asistencia/actions/workflows/tests.yml/badge.svg)](https://github.com/Andres-M1/Gestion-asistencia/actions/workflows/tests.yml)
+
 API de **avisos de ausencia docente**: el docente avisa que no va a dar una clase concreta y los alumnos inscriptos en esa cátedra se enteran. Este repo es **solo la API**; la app Android (docentes y alumnos) y el frontend web (administrador / preceptor) son proyectos aparte.
 
 Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre entero en **Docker**, así que funciona igual en cualquier máquina.
