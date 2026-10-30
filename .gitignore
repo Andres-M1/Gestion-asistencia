@@ -10,3 +10,8 @@ secrets/*
 !secrets/.gitkeep
 # Configuración personal de Claude Code (settings.json sí se comparte)
 .claude/settings.local.json
+
+# Cobertura de tests (pytest-cov)
+.coverage
+.coverage.*
+htmlcov/

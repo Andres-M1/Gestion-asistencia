@@ -93,6 +93,7 @@ psycopg[binary]==3.3.6       # Driver de PostgreSQL (versión precompilada, no r
 alembic==1.20.0              # Migraciones
 pydantic-settings==2.16.0    # Configuración desde .env
 pytest==9.1.1                # Tests
+pytest-cov==7.1.0            # Cobertura de los tests (pytest --cov)
 pwdlib[argon2]==0.3.1        # Encriptado de contraseñas (Argon2)
 pyjwt==2.15.1                # Tokens de acceso (JWT)
 tzdata==2026.5               # Zonas horarias para zoneinfo (también en Windows)
