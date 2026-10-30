@@ -2,6 +2,23 @@
 
 Cómo correr los tests de la API, ver la cobertura y leer los resultados en GitHub. Los comandos se corren desde la raíz del proyecto.
 
+## Resumen rápido
+
+Desde la carpeta del proyecto, con Docker abierto y la base levantada (`docker compose up -d`):
+
+| Quiero… | Comando | Si salió bien |
+|---------|---------|---------------|
+| Probar toda la API | `pytest` | `203 passed` |
+| Probar el flujo completo, como la app | `tests/e2e/correr.sh` | `29 passed` |
+| Probar un solo archivo | `pytest tests/test_hu02_avisos.py` | `passed` |
+
+- Son **dos comandos**: `pytest` y `tests/e2e/correr.sh`.
+- **No borran ni modifican** tus datos.
+- En cada push o pull request a `main` se corren solos: el resultado está en la pestaña **Actions** (verde = bien).
+- Si da error `pytest: orden no encontrada` (o `command not found`), primero: `source .venv/bin/activate`.
+
+Si algo falla, mirá la sección "Si algo falla" más abajo.
+
 ## 1. Tipos de test
 
 | Tipo | Dónde | Qué prueba | Cómo corre |
