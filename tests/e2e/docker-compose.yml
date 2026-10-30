@@ -1,0 +1,45 @@
+# Stack aislado para los tests end-to-end. Lo usa tests/e2e/correr.sh con otro
+# nombre de proyecto (gestion_asist_e2e): no comparte contenedores ni volúmenes
+# con el docker-compose.yml de desarrollo.
+#
+# - La API corre desde la imagen, sin montar el código: no entra el .env de
+#   desarrollo (además está en .dockerignore).
+# - Sin SMTP ni Firebase: no salen correos ni push reales.
+# - La base guarda los datos en memoria (tmpfs): arranca vacía cada vez y no
+#   publica ningún puerto.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: gestion_asist_e2e
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U e2e -d gestion_asist_e2e"]
+      interval: 2s
+      retries: 30
+
+  api:
+    build:
+      context: ../..
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: gestion_asist_e2e
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      SECRET_KEY: clave-solo-para-tests-e2e-no-usar-en-produccion
+      SMTP_HOST: ""
+      FIREBASE_CREDENTIALS: ""
+    ports:
+      - "${E2E_PUERTO:-8001}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "alembic upgrade head && fastapi run app/main.py --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 2s
+      retries: 30
