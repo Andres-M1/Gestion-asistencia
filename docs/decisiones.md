@@ -161,3 +161,7 @@ Con `app/scripts/crear_admin.py`, que pide la contraseña por teclado.
 - `abrir_sesion()` se reemplaza por la sesión del test.
 
 *Por qué:* las reglas de 1 hora y 7 días se prueban en los bordes exactos, y los tests nunca envían correos ni push reales.
+
+**T30. `firebase-admin` fijado en 7.7.0 y el aviso de `MulticastMessage.tokens` silenciado en los tests.**
+Esa versión marca como obsoleto `MulticastMessage(tokens=...)` (lo usa `core/push.py`) y sugiere `fids`. El filtro está en `pytest.ini` y apaga solo ese mensaje.
+*Por qué:* los `fids` no son el token de `onNewToken` que manda la app; pasarlos cambiaría el destinatario y el push dejaría de llegar. **Si se actualiza `firebase-admin`, revisar este punto**: que `tokens` siga existiendo y que el filtro siga haciendo falta.

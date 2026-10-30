@@ -37,11 +37,11 @@ También se puede dentro del contenedor: `docker compose exec web pytest`. Si sa
 app/services/ausencias.py                  89      1    99%   46
 ...
 TOTAL                                    1009     20    98%
-============== 203 passed, 29 deselected, 356 warnings in 44.15s ===============
+===================== 203 passed, 29 deselected in 43.73s ======================
 ```
 
 - `29 deselected` son los e2e: es normal.
-- Los `warnings` no son errores.
+- Si aparecen `warnings`, no son errores. El aviso de firebase-admin sobre `MulticastMessage.tokens` está silenciado a propósito en `pytest.ini` (ver T30 en [decisiones.md](decisiones.md)).
 - La columna `Missing` indica las líneas de cada archivo que ningún test ejecuta.
 
 Variantes útiles:
