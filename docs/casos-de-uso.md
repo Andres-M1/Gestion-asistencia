@@ -63,9 +63,11 @@ flowchart LR
     admin --- cu12
 
     cu03 -. "«include»" .-> cu08
-    cu02 -. "«extend»" .-> cu03
+    cu03 -. "«include»" .-> cu02
     cu07 -. "«extend»" .-> cu06
 
+    alumno --- cu08
+    admin --- cu08
     cu08 --- smtp
     cu08 --- fcm
 ```
@@ -73,9 +75,9 @@ flowchart LR
 Notas sobre el diagrama:
 
 - **CU-03 incluye CU-08:** todo aviso registrado dispara las notificaciones.
-- **CU-02 → CU-03:** la app arma la lista con CU-02 y el docente elige una opción. CU-03 no depende de CU-02, porque el servidor vuelve a validar todo.
+- **CU-03 incluye CU-02:** ver la lista de clases disponibles es un paso obligatorio para registrar el aviso. El docente no elige una fecha libre (decisión F2). Aun así, la API no verifica que la app haya pedido la lista: el `POST` vuelve a validar todo.
 - **CU-07 → CU-06:** desde cada inscripción, el alumno puede ver los avisos de esa cátedra (`?catedra_id=`).
-- Alumnos y preceptores son destinatarios de CU-08, pero no lo inician.
+- **Alumno y Preceptor/Admin con CU-08:** son quienes reciben las notificaciones (HU-06): el alumno, correo y push; el preceptor, solo correo. No inician el caso: lo dispara CU-03.
 
 ## Errores comunes a todos los casos
 
@@ -155,7 +157,7 @@ Valen para todos los casos que requieren sesión (todos menos CU-01) y no se rep
 
 **Flujo principal**
 
-1. El docente elige una clase de la lista (CU-02) y confirma.
+1. Se ejecuta **CU-02 Ver clases disponibles** (include): el docente elige una clase de la lista y confirma.
 2. La app envía `POST /docente/avisos` con `{catedra_id, fecha}`.
 3. La API valida:
    1. que la cátedra exista y sea del docente;
