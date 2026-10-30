@@ -9,23 +9,24 @@ Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre e
 ## Índice
 
 1. [Estado del proyecto](#estado-del-proyecto)
-2. [Tecnologías utilizadas](#tecnologías-utilizadas)
-3. [Dependencias](#dependencias)
-4. [Instalación](#instalación)
+2. [Documentación](#documentación)
+3. [Tecnologías utilizadas](#tecnologías-utilizadas)
+4. [Dependencias](#dependencias)
+5. [Instalación](#instalación)
    - [Windows (con WSL2)](#windows-con-wsl2)
    - [Linux (Ubuntu / Debian)](#linux-ubuntu--debian)
    - [Opcional: correos con Gmail](#opcional-correos-con-gmail) · [Opcional: push con Firebase](#opcional-push-con-firebase)
    - [¿Quedó todo bien?](#quedó-todo-bien)
-5. [Variables de entorno](#variables-de-entorno)
-6. [Modelo de datos](#modelo-de-datos)
-7. [API: endpoints disponibles](#api-endpoints-disponibles)
-8. [Estructura de carpetas](#estructura-de-carpetas)
-9. [Cómo fluye un request](#cómo-fluye-un-request)
-10. [Agregar un recurso nuevo (guía)](#agregar-un-recurso-nuevo-guía)
-11. [Migraciones de base de datos](#migraciones-de-base-de-datos)
-12. [Tests](#tests)
-13. [Comandos útiles](#comandos-útiles)
-14. [Solución de problemas](#solución-de-problemas)
+6. [Variables de entorno](#variables-de-entorno)
+7. [Modelo de datos](#modelo-de-datos)
+8. [API: endpoints disponibles](#api-endpoints-disponibles)
+9. [Estructura de carpetas](#estructura-de-carpetas)
+10. [Cómo fluye un request](#cómo-fluye-un-request)
+11. [Agregar un recurso nuevo (guía)](#agregar-un-recurso-nuevo-guía)
+12. [Migraciones de base de datos](#migraciones-de-base-de-datos)
+13. [Tests](#tests)
+14. [Comandos útiles](#comandos-útiles)
+15. [Solución de problemas](#solución-de-problemas)
 
 ---
 
@@ -45,6 +46,21 @@ Está construido con **FastAPI**, **SQLModel** (ORM) y **PostgreSQL**, y corre e
 | HU-10  | Admin      | Asignar docentes a materias (cátedras)                     | ✅ `/catedras` |
 
 Además: CRUD de administrador para carreras, materias e inscripciones (necesarios para cargar los datos).
+
+---
+
+## Documentación
+
+Documentación del proyecto en [`docs/`](docs/), armada a partir del código:
+
+| Archivo | Contenido |
+|---------|-----------|
+| [Historias de usuario](docs/historias-de-usuario.md) | HU-01 a HU-10 con criterios de aceptación (Dado/Cuando/Entonces), endpoints, estado y lo que queda fuera de alcance. |
+| [Casos de uso](docs/casos-de-uso.md) | Diagrama de casos de uso por actor y una ficha por caso: precondición, flujos y errores. |
+| [Diagramas](docs/diagramas.md) | DER completo con restricciones, diagrama de clases, secuencias de login y de registro de aviso, y componentes. |
+| [API](docs/api.md) | Contrato para la app Android y la web: endpoints por cliente, ejemplos de request y response, y errores. |
+| [Reglas de negocio](docs/reglas-de-negocio.md) | Avisos, notificaciones, zona horaria y usuarios. |
+| [Decisiones de diseño](docs/decisiones.md) | Decisiones funcionales y técnicas, con su motivo. |
 
 ---
 
