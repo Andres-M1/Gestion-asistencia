@@ -89,7 +89,7 @@ El aviso no tiene motivo, y el docente no elige una fecha libre: elige una opci�
 
 **Registro del aviso**
 
-8. **Dada** una clase válida, **cuando** hace `POST /docente/avisos` con `{catedra_id, fecha}`, **entonces** recibe `201` con el detalle del aviso: `id`, `fecha`, `materia`, `comision`, `dia_semana`, horario, `docente` y `creado_en`. El aviso queda guardado con estado `activo` y se disparan las notificaciones de [HU-06](#hu-06-notificaciones-al-registrarse-un-aviso).
+8. **Dada** una clase válida, **cuando** hace `POST /docente/avisos` con `{catedra_id, fecha}`, **entonces** recibe `201` con el detalle del aviso: `id`, `fecha`, `materia`, `comision`, `dia_semana`, horario, `docente` y `creado_en`. El aviso queda guardado con estado `activo`, a nombre del docente logueado, y se disparan las notificaciones de [HU-06](#hu-06-notificaciones-al-registrarse-un-aviso).
 9. El servidor **vuelve a validar todo**, sin confiar en que el cliente mandó una opción de la lista:
    - **Dada** una cátedra que no existe o que no es del docente, **entonces** `404` (`"Cátedra no encontrada"`).
    - **Dada** una fecha que no cae en el día de cursada de la cátedra, **entonces** `422` (`"La fecha no corresponde al día de cursada de la cátedra"`).
@@ -109,12 +109,13 @@ El aviso no tiene motivo, y el docente no elige una fecha libre: elige una opci�
 
 ### Criterios de aceptación
 
-1. **Dado** un docente logueado, **cuando** pide `GET /docente/avisos`, **entonces** recibe los avisos de sus cátedras, **pasados y futuros**, del más nuevo al más viejo (fecha descendente, después hora de inicio descendente, después `id` descendente).
+1. **Dado** un docente logueado, **cuando** pide `GET /docente/avisos`, **entonces** recibe los avisos que **dio él**, **pasados y futuros**, del más nuevo al más viejo (fecha descendente, después hora de inicio descendente, después `id` descendente).
 2. **Dado** otro docente con avisos, **entonces** sus avisos no aparecen.
-3. Cada aviso trae el mismo detalle que en HU-02 y **no** incluye `estado`.
-4. Se pagina con `offset` y `limit` (máximo 100, por defecto 100).
-5. **Dado** un docente sin avisos, **entonces** recibe `[]`.
-6. Sin token: `401`. Otro rol, o un docente sin perfil: `403`.
+3. **Dada** una cátedra que se reasignó a otro docente, **entonces** los avisos que dio el docente anterior siguen en su historial y a su nombre, y el docente nuevo no los ve.
+4. Cada aviso trae el mismo detalle que en HU-02 y **no** incluye `estado`.
+5. Se pagina con `offset` y `limit` (máximo 100, por defecto 100).
+6. **Dado** un docente sin avisos, **entonces** recibe `[]`.
+7. Sin token: `401`. Otro rol, o un docente sin perfil: `403`.
 
 ---
 
@@ -248,7 +249,7 @@ Cómo se refleja en el código:
    - `carrera_id`;
    - `materia_id`;
    - `comision`: texto exacto sin distinguir mayúsculas, así que `"1k1"` encuentra `"1K1"`, pero `"1K"` no encuentra `"1K1"`;
-   - `docente_id`;
+   - `docente_id`: el docente que dio el aviso, aunque la cátedra se haya reasignado después;
    - `fecha_desde` y `fecha_hasta`, ambas inclusive.
 3. **Dado** `fecha_desde` posterior a `fecha_hasta`, **entonces** `422` (`"fecha_desde no puede ser posterior a fecha_hasta"`).
 4. **Dados** ids que no existen, **entonces** `[]` (no `404`).

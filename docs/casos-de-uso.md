@@ -162,7 +162,7 @@ Valen para todos los casos que requieren sesión (todos menos CU-01) y no se rep
    2. que la fecha caiga en el `dia_semana` de la cátedra;
    3. que falte al menos 1 hora para `fecha + hora_inicio` (hora de Argentina);
    4. que la clase empiece dentro de los próximos 7 días.
-4. La API guarda el aviso (`estado = activo`, `creado_en` = ahora en UTC).
+4. La API guarda el aviso (`docente_id` = el docente logueado, `estado = activo`, `creado_en` = ahora en UTC).
 5. Se ejecuta **CU-08 Notificar aviso** (include): se arman los destinatarios y se programa el envío en segundo plano.
 6. La API devuelve `201` con el detalle del aviso.
 
@@ -176,7 +176,7 @@ Valen para todos los casos que requieren sesión (todos menos CU-01) y no se rep
 - **2a.** El usuario no tiene perfil de docente → `403` `"El usuario no tiene perfil de docente"`.
 - **5a.** Falla el armado de los destinatarios → se registra en el log y el aviso queda creado igual (`201`).
 
-**Postcondición:** existe una fila en `ausencia` para esa cátedra y fecha, y quedó programado el envío de notificaciones. El aviso no se puede cancelar ni editar.
+**Postcondición:** existe una fila en `ausencia` para esa cátedra y fecha, a nombre del docente que la dio, y quedó programado el envío de notificaciones. El aviso no se puede cancelar ni editar.
 
 ---
 
@@ -193,7 +193,7 @@ Valen para todos los casos que requieren sesión (todos menos CU-01) y no se rep
 
 1. El docente abre "Mis avisos".
 2. La app pide `GET /docente/avisos`.
-3. La API devuelve `200` con los avisos de las cátedras del docente, pasados y futuros, del más nuevo al más viejo.
+3. La API devuelve `200` con los avisos que dio el docente (`ausencia.docente_id`), pasados y futuros, del más nuevo al más viejo. Si una cátedra se reasignó, los avisos anteriores siguen siendo de quien los dio.
 
 **Flujos alternativos**
 
@@ -377,7 +377,7 @@ Valen para todos los casos que requieren sesión (todos menos CU-01) y no se rep
 - **E1.** `DELETE` de una cátedra con inscripciones o avisos → `409` `"No se puede borrar: tiene registros asociados"`.
 - **E2.** `id` inexistente → `404` `"Cátedra no encontrada"`.
 
-**Postcondición:** la cátedra aparece en las clases disponibles de su docente (CU-02) y se le pueden cargar inscripciones (CU-11).
+**Postcondición:** la cátedra aparece en las clases disponibles de su docente (CU-02) y se le pueden cargar inscripciones (CU-11). Si se reasignó, los avisos anteriores siguen a nombre del docente que los dio.
 
 ---
 

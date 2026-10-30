@@ -27,6 +27,7 @@ erDiagram
     ALUMNO ||--o{ INSCRIPCION : "se inscribe"
     CATEDRA ||--o{ INSCRIPCION : "tiene"
     CATEDRA ||--o{ AUSENCIA : "tiene avisos"
+    DOCENTE ||--o{ AUSENCIA : "da"
 
     USUARIO {
         integer id PK
@@ -79,6 +80,7 @@ erDiagram
     AUSENCIA {
         integer id PK
         integer catedra_id FK "UK compuesta con fecha"
+        integer docente_id FK "quien dio el aviso"
         date fecha
         estadoausencia estado "enum: activo"
         timestamptz creado_en "UTC"
@@ -112,6 +114,7 @@ Nombres tal como están en la base. Los generan las `naming_convention` de `app/
 | `inscripcion` | `fk_inscripcion_catedra_id_catedra` | FOREIGN KEY | `catedra_id → catedra.id` |
 | `ausencia` | `uq_ausencia_catedra_fecha` | UNIQUE | `(catedra_id, fecha)`: un aviso por clase |
 | `ausencia` | `fk_ausencia_catedra_id_catedra` | FOREIGN KEY | `catedra_id → catedra.id` |
+| `ausencia` | `fk_ausencia_docente_id_docente` | FOREIGN KEY | `docente_id → docente.id`: quien dio el aviso. No cambia si la cátedra se reasigna. |
 
 - Las claves foráneas no tienen `ON DELETE`: borrar una fila referenciada falla, y la API responde `409`.
 - Los valores por defecto (`activo = true`, `vigente = true`, `estado = 'activo'`, `creado_en = ahora en UTC`) los pone la aplicación, no la base.
@@ -203,6 +206,7 @@ classDiagram
         <<table>>
         +int id
         +int catedra_id
+        +int docente_id
         +date fecha
         +EstadoAusencia estado
         +datetime creado_en
@@ -219,6 +223,7 @@ classDiagram
     Alumno "1" -- "*" Inscripcion : inscripciones / alumno
     Catedra "1" -- "*" Inscripcion : inscripciones / catedra
     Catedra "1" -- "*" Ausencia : ausencias / catedra
+    Docente "1" -- "*" Ausencia : ausencias / docente
 
     %% ---------- Schemas (app/schemas) ----------
     class LoginRequest {
@@ -493,7 +498,7 @@ sequenceDiagram
         A-->>E: AvisoInvalido
         E-->>APP: 422 "Solo se puede avisar sobre clases de los próximos 7 días"
     else válida
-        A->>DB: INSERT ausencia (estado activo, creado_en UTC) + COMMIT
+        A->>DB: INSERT ausencia (docente_id del docente logueado, estado activo, creado_en UTC) + COMMIT
         alt ya hay aviso (uq_ausencia_catedra_fecha)
             DB-->>A: IntegrityError
             Note over E: manejar_integridad hace rollback

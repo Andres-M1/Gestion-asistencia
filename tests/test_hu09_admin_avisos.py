@@ -43,7 +43,7 @@ def esc(session, datos):
                                            dia_semana=2, hora_inicio=time(8, 0), hora_fin=time(10, 0)))
 
     def aviso(catedra, fecha):
-        return _guardar(session, Ausencia(catedra_id=catedra.id, fecha=fecha))
+        return _guardar(session, Ausencia(catedra_id=catedra.id, docente_id=catedra.docente_id, fecha=fecha))
 
     # a_1803 se crea antes que b_1803, así b_1803 tiene id mayor y va primero
     return {
@@ -108,6 +108,19 @@ def test_filtro_comision_no_busca_texto_parcial(client, datos, esc):
 
 
 def test_filtro_docente(client, datos, esc):
+    assert nombres(esc, avisos(client, datos, docente_id=datos["doc_b"].id)) == ["b_1803", "fisica"]
+
+
+def test_filtro_docente_usa_quien_dio_el_aviso_aunque_se_reasigne_la_catedra(client, datos, esc):
+    """martes_a y lunes_a (docente A) pasan al docente B: sus avisos siguen siendo de A."""
+    for catedra in ("martes_a", "lunes_a"):
+        r = client.patch(f"/api/v1/catedras/{datos[catedra].id}", headers=auth(datos["u_admin"]),
+                         json={"docente_id": datos["doc_b"].id})
+        assert r.status_code == 200, r.text
+
+    de_a = avisos(client, datos, docente_id=datos["doc_a"].id)
+    assert nombres(esc, de_a) == ["futuro", "a_1803", "lunes", "pasado"]
+    assert {a["docente"]["apellido"] for a in de_a} == {"80000001"}
     assert nombres(esc, avisos(client, datos, docente_id=datos["doc_b"].id)) == ["b_1803", "fisica"]
 
 

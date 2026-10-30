@@ -7,6 +7,7 @@ from sqlmodel import DateTime, Field, Relationship, SQLModel, UniqueConstraint
 
 if TYPE_CHECKING:
     from app.models.catedra import Catedra
+    from app.models.docente import Docente
 
 
 class EstadoAusencia(str, Enum):
@@ -19,6 +20,8 @@ class Ausencia(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     catedra_id: int = Field(foreign_key="catedra.id")
+    # Quién dio el aviso: no cambia aunque después se reasigne la cátedra a otro docente
+    docente_id: int = Field(foreign_key="docente.id")
     fecha: date
     estado: EstadoAusencia = EstadoAusencia.activo
     creado_en: datetime = Field(
@@ -26,3 +29,4 @@ class Ausencia(SQLModel, table=True):
     )
 
     catedra: "Catedra" = Relationship(back_populates="ausencias")
+    docente: "Docente" = Relationship(back_populates="ausencias")

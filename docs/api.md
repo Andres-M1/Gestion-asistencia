@@ -186,7 +186,7 @@ Registra el aviso de que el docente no dará una clase (HU-02) y programa las no
 }
 ```
 
-La respuesta no espera a que salgan los correos y los push: se envían en segundo plano y, si fallan, el aviso queda creado igual.
+`docente` es el docente que dio el aviso; se mantiene aunque después se reasigne la cátedra. La respuesta no espera a que salgan los correos y los push: se envían en segundo plano y, si fallan, el aviso queda creado igual.
 
 **Errores**
 
@@ -200,7 +200,7 @@ La respuesta no espera a que salgan los correos y los push: se envían en segund
 
 ### `GET /docente/avisos`
 
-Historial de avisos del docente (HU-03): pasados y futuros, del más nuevo al más viejo (fecha, hora de inicio e `id`, descendentes).
+Avisos que dio el docente (HU-03), aunque la cátedra se haya reasignado después: pasados y futuros, del más nuevo al más viejo (fecha, hora de inicio e `id`, descendentes).
 
 **Query:** `offset`, `limit` (≤ 100).
 
@@ -321,7 +321,7 @@ Todos los avisos, pasados y futuros, del más nuevo al más viejo (HU-09). Los f
 | `carrera_id` | int | Carrera de la materia de la cátedra. |
 | `materia_id` | int | |
 | `comision` | string | Texto exacto, sin distinguir mayúsculas (`1k1` = `1K1`). No busca coincidencias parciales. |
-| `docente_id` | int | Id del **docente**, no del usuario. |
+| `docente_id` | int | Id del **docente** que dio el aviso (no del usuario). Si la cátedra se reasignó, no es el docente actual de la cátedra. |
 | `fecha_desde` | date | Inclusive. |
 | `fecha_hasta` | date | Inclusive. |
 | `offset`, `limit` | int | Paginación (`limit` ≤ 100). |
@@ -585,6 +585,7 @@ Cuando un `POST` o `PATCH` viola una restricción de PostgreSQL, la API devuelve
 | `fk_inscripcion_alumno_id_alumno` | 422 | El alumno indicado no existe |
 | `fk_inscripcion_catedra_id_catedra` | 422 | La cátedra indicada no existe |
 | `fk_ausencia_catedra_id_catedra` | 422 | La cátedra indicada no existe |
+| `fk_ausencia_docente_id_docente` | 422 | El docente indicado no existe |
 
 Otra restricción sin mensaje propio responde `"Los datos violan una restricción de la base"`.
 

@@ -112,11 +112,11 @@ def registrar_aviso(session: Session, docente: Docente, catedra_id: int, fecha: 
     if inicio > momento + VENTANA:
         raise AvisoInvalido("Solo se puede avisar sobre clases de los próximos 7 días")
 
-    return crud.crear(session, Ausencia(catedra_id=catedra.id, fecha=fecha))
+    return crud.crear(session, Ausencia(catedra_id=catedra.id, docente_id=docente.id, fecha=fecha))
 
 
 def a_detalle(aviso: Ausencia) -> AvisoDetalle:
-    """Arma la respuesta de un aviso con los datos de su clase."""
+    """Arma la respuesta de un aviso con los datos de su clase y el docente que lo dio."""
     catedra = aviso.catedra
     return AvisoDetalle(
         id=aviso.id,
@@ -126,7 +126,7 @@ def a_detalle(aviso: Ausencia) -> AvisoDetalle:
         dia_semana=catedra.dia_semana,
         hora_inicio=catedra.hora_inicio,
         hora_fin=catedra.hora_fin,
-        docente=DocenteResumen(nombre=catedra.docente.nombre, apellido=catedra.docente.apellido),
+        docente=DocenteResumen(nombre=aviso.docente.nombre, apellido=aviso.docente.apellido),
         creado_en=aviso.creado_en,
     )
 
@@ -138,17 +138,19 @@ _MAS_NUEVOS_PRIMERO = (Ausencia.fecha.desc(), Catedra.hora_inicio.desc(), Ausenc
 
 def _con_detalle(consulta):
     """Carga cátedra, materia y docente de cada aviso en 3 consultas en total, no una por aviso."""
-    return consulta.options(
-        selectinload(Ausencia.catedra).options(selectinload(Catedra.materia), selectinload(Catedra.docente))
-    )
+    return consulta.options(selectinload(Ausencia.catedra).selectinload(Catedra.materia), selectinload(Ausencia.docente))
 
 
 def avisos_del_docente(session: Session, docente: Docente, offset: int = 0, limit: int = 100) -> list[AvisoDetalle]:
-    """Historial de avisos del docente (HU-03), pasados y futuros, del más nuevo al más viejo."""
+    """Avisos que dio el docente (HU-03), pasados y futuros, del más nuevo al más viejo.
+
+    Se filtra por el docente del aviso, no por el de la cátedra: si la cátedra se
+    reasignó, los avisos anteriores siguen siendo de quien los dio.
+    """
     consulta = (
         select(Ausencia)
         .join(Catedra)
-        .where(Catedra.docente_id == docente.id)
+        .where(Ausencia.docente_id == docente.id)
         .order_by(*_MAS_NUEVOS_PRIMERO)
         .offset(offset)
         .limit(limit)
@@ -210,7 +212,7 @@ def avisos_filtrados(
     if comision is not None:
         filtros.append(func.lower(Catedra.comision) == comision.lower())
     if docente_id is not None:
-        filtros.append(Catedra.docente_id == docente_id)
+        filtros.append(Ausencia.docente_id == docente_id)  # quien dio el aviso, no el docente actual de la cátedra
     if fecha_desde is not None:
         filtros.append(Ausencia.fecha >= fecha_desde)
     if fecha_hasta is not None:

@@ -23,6 +23,7 @@ MENSAJES = {
     "fk_inscripcion_alumno_id_alumno": "El alumno indicado no existe",
     "fk_inscripcion_catedra_id_catedra": "La cátedra indicada no existe",
     "fk_ausencia_catedra_id_catedra": "La cátedra indicada no existe",
+    "fk_ausencia_docente_id_docente": "El docente indicado no existe",
 }
 
 _UNICO, _CLAVE_FORANEA = "23505", "23503"  # códigos de error de PostgreSQL

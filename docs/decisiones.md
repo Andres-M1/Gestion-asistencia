@@ -67,91 +67,95 @@ Si ya existe, el `commit` lanza `IntegrityError` y `manejar_integridad` lo convi
 **T6. Columna `estado` con un único valor (`activo`).**
 La respuesta (`AvisoDetalle`) no lo incluye: "un aviso registrado siempre está activo (HU-04 descartada)".
 
-**T7. Orden determinístico en los listados de avisos.**
+**T7. El aviso guarda el docente que lo dio (`ausencia.docente_id`), en lugar de deducirlo de la cátedra.**
+El historial del docente (HU-03), el filtro `docente_id` del admin (HU-09) y el campo `docente` de `AvisoDetalle` usan esa columna. Los avisos del alumno y las notificaciones siguen buscando por cátedra.
+*Por qué:* el aviso tiene que quedar a nombre de quien lo dio aunque después se reasigne la cátedra a otro docente. Si se dedujera de `catedra.docente_id`, una reasignación movería el historial al docente nuevo. No hay un `CHECK` que obligue a que coincida con el docente de la cátedra: no puede comparar con otra tabla, y la regla solo vale al crear el aviso (la valida `registrar_aviso`). La migración completó los avisos existentes con el docente que su cátedra tenía en ese momento.
+
+**T8. Orden determinístico en los listados de avisos.**
 El orden es fecha, hora de inicio e `id`.
 *Por qué:* "así la paginación no repite ni saltea avisos" (comentario en `services/ausencias.py`).
 
-**T8. Carga en lote de cátedra, materia y docente (`selectinload`).**
+**T9. Carga en lote de cátedra, materia y docente (`selectinload`).**
 *Por qué:* "3 consultas en total, no una por aviso" (`_con_detalle`).
 
 ### Notificaciones
 
-**T9. Un solo `BackgroundTasks`, sin colas ni Celery.**
+**T10. Un solo `BackgroundTasks`, sin colas ni Celery.**
 La API responde `201` y después envía correos y push.
 *Por qué:* el docente no tiene que esperar a SMTP ni a FCM, y el volumen (los alumnos de una cátedra más los preceptores) no justifica sumar infraestructura. Así lo define `CLAUDE.md`: "Sin colas, sin Celery, sin tabla de historial de notificaciones".
 
-**T10. Destinatarios y textos se arman durante el request.**
+**T11. Destinatarios y textos se arman durante el request.**
 *Por qué:* "FastAPI cierra la sesión de la base antes de correr los BackgroundTasks" (docstring de `services/notificaciones.py`). Para limpiar tokens inválidos, la tarea abre su propia sesión (`abrir_sesion`).
 
-**T11. Los fallos de notificación nunca anulan el aviso.**
+**T12. Los fallos de notificación nunca anulan el aviso.**
 `programar` y `enviar` capturan todas las excepciones y las registran en el log.
 *Por qué:* el aviso ya quedó registrado. Que falle un correo no es motivo para hacerle creer al docente que su aviso no se registró.
 
-**T12. Un correo por destinatario.**
+**T13. Un correo por destinatario.**
 *Por qué:* nadie ve los emails de los demás ("nunca todos en Para", `CLAUDE.md`). Se usa una sola conexión SMTP para todos los mensajes, y si falla uno se sigue con el resto.
 
-**T13. `smtplib` de la biblioteca estándar; `firebase-admin` como única dependencia nueva.**
+**T14. `smtplib` de la biblioteca estándar; `firebase-admin` como única dependencia nueva.**
 *Por qué:* `CLAUDE.md` pide dependencias nuevas solo si son imprescindibles. El correo no necesita ninguna; el push sí necesita la librería oficial de Firebase.
 
-**T14. Solo se borran los tokens con `UNREGISTERED` o `SENDER_ID_MISMATCH`.**
+**T15. Solo se borran los tokens con `UNREGISTERED` o `SENDER_ID_MISMATCH`.**
 *Por qué:* "INVALID_ARGUMENT no se incluye: puede venir de un mensaje mal armado y borraría los tokens de todos" (comentario en `core/push.py`).
 
-**T15. Un celular por usuario: columna `usuario.fcm_token`, sin tabla de dispositivos.**
+**T16. Un celular por usuario: columna `usuario.fcm_token`, sin tabla de dispositivos.**
 *Por qué:* es el mínimo que pide HU-06. Si un token ya lo tenía otro usuario, se le quita "para que no reciba push ajenos" (docstring de `asignar_token`).
 
-**T16. Si falta la configuración SMTP o Firebase, la app arranca igual.**
+**T17. Si falta la configuración SMTP o Firebase, la app arranca igual.**
 Deja un warning al iniciar y saltea ese tipo de envío.
 *Por qué:* se puede desarrollar y probar sin credenciales reales.
 
-**T17. El email del preceptor está en `usuario.email`.**
+**T18. El email del preceptor está en `usuario.email`.**
 El admin no tiene perfil (como sí tienen docentes y alumnos), así que el email va en `Usuario`, es opcional y se carga con `crear_admin.py`. Un admin sin email no recibe correos.
 
 ### Datos y persistencia
 
-**T18. `Usuario` separado de los perfiles `Docente` y `Alumno`.**
+**T19. `Usuario` separado de los perfiles `Docente` y `Alumno`.**
 `Usuario` tiene las credenciales y el rol de todos; el perfil tiene los datos personales. La relación es 1 a 1 (`usuario_id` único).
 *Por qué:* un único login para los tres roles (HU-01). El admin no necesita perfil.
 
-**T19. Bajas lógicas en lugar de `DELETE`.**
+**T20. Bajas lógicas en lugar de `DELETE`.**
 - Docentes y alumnos se desactivan con `activo: false`; "así se conserva el historial de sus avisos" (docstring de `endpoints/docentes.py`).
 - Las inscripciones se dan de baja con `vigente: false`, "sin perder el registro".
 
 Carreras, materias, cátedras e inscripciones sí tienen `DELETE`, pero falla con `409` si hay datos asociados (las FK no tienen `ON DELETE`).
 
-**T20. `naming_convention` + diccionario `MENSAJES`.**
+**T21. `naming_convention` + diccionario `MENSAJES`.**
 Las restricciones tienen nombres predecibles (`uq_<tabla>_<columna>`, `fk_...`), y `manejar_integridad` traduce cada una a un mensaje en español con el código HTTP correcto: `409` para unicidad, `422` para FK y CHECK.
 *Por qué:* "Alembic los necesita para poder borrarlos" (comentario en `app/models/__init__.py`), y el cliente recibe un mensaje claro en lugar de un error de la base.
 
-**T21. Validación en dos niveles.**
+**T22. Validación en dos niveles.**
 Los schemas validan formato (DNI, largo de la contraseña, email, `dia_semana`, horario) y la base valida integridad (únicos, FK, CHECK).
 *Por qué:* el schema da errores tempranos y detallados; la base garantiza la consistencia aunque falle o se saltee la validación del schema (por ejemplo, el `PATCH` de cátedra no valida el horario y lo frena `ck_catedra_horario`).
 
-**T22. Migraciones con Alembic, revisadas a mano.**
+**T23. Migraciones con Alembic, revisadas a mano.**
 Por ejemplo, el enum `estadoausencia` se crea explícitamente antes de `add_column`, y el downgrade de `motivo` usa `server_default`.
 *Por qué:* "add_column no crea el tipo enum en PostgreSQL: hay que crearlo antes", y "si ya hay avisos cargados, la columna NOT NULL necesita un valor" (comentarios en las migraciones).
 
 ### Seguridad
 
-**T23. JWT sin estado + chequeo de `activo` en cada request.**
+**T24. JWT sin estado + chequeo de `activo` en cada request.**
 El token no se guarda en la base, pero en cada request se busca el usuario y se verifica que esté activo.
 *Por qué:* desactivar a alguien corta su acceso al instante, sin lista de tokens revocados.
 
-**T24. Hash ficticio en el login.**
+**T25. Hash ficticio en el login.**
 *Por qué:* "si el DNI no existe igual se verifica una contraseña, así la respuesta tarda lo mismo y no revela qué DNIs están registrados" (`services/auth.py`). Por el mismo motivo, el mensaje de error es igual en todos los casos.
 
-**T25. El primer admin se crea por script, no por la API.**
+**T26. El primer admin se crea por script, no por la API.**
 Con `app/scripts/crear_admin.py`, que pide la contraseña por teclado.
 *Por qué:* el alcance (HU-08) solo incluye el alta de docentes y estudiantes. Pedirla por teclado hace que "no quede en el historial de la terminal" (docstring del script).
 
-**T26. Secretos fuera de git.**
+**T27. Secretos fuera de git.**
 `.env` y el JSON del service account de Firebase (en `secrets/`) están en `.gitignore`.
 
-**T27. `POST /auth/token` oculto del esquema.**
+**T28. `POST /auth/token` oculto del esquema.**
 *Por qué:* existe solo para el botón *Authorize* de `/docs`, que usa el formato OAuth2 (`username` = DNI). Los clientes usan `POST /auth/login` con JSON.
 
 ### Tests
 
-**T28. Hora "actual" reemplazable y servicios externos falsos.**
+**T29. Hora "actual" reemplazable y servicios externos falsos.**
 - `ausencias.ahora()` existe para que los tests fijen la hora ("Los tests la reemplazan para fijar la hora").
 - SMTP y FCM se reemplazan por fakes en todos los tests.
 - `abrir_sesion()` se reemplaza por la sesión del test.

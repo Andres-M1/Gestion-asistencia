@@ -61,6 +61,7 @@ La regla 5 no se consulta antes de insertar: la garantiza la base de datos, y el
 Datos del aviso guardado:
 
 - **Sin motivo**: la tabla `ausencia` no tiene esa columna.
+- `docente_id` = el docente logueado que dio el aviso.
 - `estado = activo`: es el único valor del enum `EstadoAusencia`.
 - `creado_en` = momento del registro, en UTC.
 
@@ -72,21 +73,30 @@ No hay endpoints para cancelar, editar ni borrar avisos (HU-04 descartada). La r
 
 | Quién | Endpoint | Qué avisos | Orden |
 |-------|----------|------------|-------|
-| Docente | `GET /docente/avisos` | Los de las cátedras que hoy tienen asignadas, pasados y futuros. | Más nuevo primero: fecha ↓, hora de inicio ↓, id ↓ |
+| Docente | `GET /docente/avisos` | Los que dio él (`ausencia.docente_id`), pasados y futuros. | Más nuevo primero: fecha ↓, hora de inicio ↓, id ↓ |
 | Alumno | `GET /alumno/avisos` | Los de las cátedras donde tiene inscripción **vigente**, con `fecha ≥ hoy` (Argentina). El de hoy aparece aunque la clase ya haya terminado. | Más próximo primero: fecha ↑, hora de inicio ↑, id ↑ |
 | Admin | `GET /admin/avisos` | Todos, pasados y futuros, con filtros combinables. | Más nuevo primero: fecha ↓, hora de inicio ↓, id ↓ |
 
 El orden siempre termina en `id`, así es determinístico y la paginación con `offset`/`limit` no repite ni saltea avisos.
 
-> ⚠️ **Pendiente de corrección.** El aviso tiene que quedar a nombre del docente que lo dio, pero hoy se asocia a la **cátedra**. Si el admin reasigna una cátedra a otro docente (`PATCH /catedras/{id}` con `docente_id`):
->
-> - los avisos anteriores de esa cátedra pasan a verse en el historial del docente nuevo;
-> - el campo `docente` de esos avisos muestra al docente actual de la cátedra.
+**El aviso queda a nombre del docente que lo dio.** `ausencia.docente_id` se guarda al registrar el aviso y no cambia. Si el admin reasigna la cátedra a otro docente (`PATCH /catedras/{id}` con `docente_id`):
+
+- los avisos anteriores siguen en el historial del docente que los dio, y el docente nuevo no los ve;
+- el campo `docente` de `AvisoDetalle` muestra a quien dio el aviso, no al docente actual de la cátedra;
+- el filtro `docente_id` del admin también usa el docente del aviso;
+- los avisos que dé el docente nuevo desde ese momento quedan a su nombre.
+
+Lo que sigue buscándose **por cátedra**:
+
+- los avisos del alumno (HU-05), según sus inscripciones vigentes;
+- los destinatarios de las notificaciones (HU-06);
+- las clases disponibles y la validación del `POST`, que usan el docente **actual** de la cátedra: solo él puede dar avisos nuevos.
 
 ### 1.7 Filtros del admin (HU-09)
 
 - `carrera_id`: la carrera de la materia de la cátedra.
-- `materia_id` y `docente_id`: los de la cátedra.
+- `materia_id`: la de la cátedra.
+- `docente_id`: el docente que dio el aviso (`ausencia.docente_id`), no el docente actual de la cátedra.
 - `comision`: igualdad exacta sin distinguir mayúsculas (`lower(comision) = lower(valor)`). No es una búsqueda parcial.
 - `fecha_desde` y `fecha_hasta`: inclusive. Si `fecha_desde > fecha_hasta`, `422`.
 - Los filtros se combinan con AND. Los ids inexistentes devuelven `[]`, no `404`.

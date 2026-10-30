@@ -93,7 +93,9 @@ def test_registra_aviso_en_estado_activo_y_devuelve_el_detalle(client, datos, se
         "dia_semana": 2, "hora_inicio": "18:00:00", "hora_fin": "20:00:00",
         "docente": {"nombre": "Doc", "apellido": "80000001"},
     }
-    assert session.get(Ausencia, cuerpo["id"]).estado == EstadoAusencia.activo
+    guardado = session.get(Ausencia, cuerpo["id"])
+    assert guardado.estado == EstadoAusencia.activo
+    assert guardado.docente_id == datos["doc_a"].id
 
 
 def test_no_permite_dos_avisos_para_la_misma_clase(client, datos):

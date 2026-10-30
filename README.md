@@ -835,6 +835,7 @@ erDiagram
     ALUMNO ||--o{ INSCRIPCION : "se inscribe"
     CATEDRA ||--o{ INSCRIPCION : "recibe"
     CATEDRA ||--o{ AUSENCIA : "registra"
+    DOCENTE ||--o{ AUSENCIA : "da"
 
     USUARIO {
         int id PK
@@ -887,6 +888,7 @@ erDiagram
     AUSENCIA {
         int id PK
         int catedra_id FK
+        int docente_id FK "quien dio el aviso"
         date fecha
         enum estado "activo"
         datetime creado_en
@@ -902,7 +904,7 @@ erDiagram
 | **Docente**     | Perfil de un profesor.                                                     | Un perfil por usuario; email único.                             |
 | **Cátedra**     | Una materia dictada por un docente en una comisión, un día y un horario.   | Comisión única por materia; `dia_semana` entre 1 (lunes) y 7 (domingo); `hora_fin` > `hora_inicio`. |
 | **Inscripción** | Un alumno anotado en una cátedra.                                          | Un alumno no puede inscribirse dos veces en la misma cátedra.   |
-| **Ausencia**    | Aviso de que el docente no dará una clase (cátedra + fecha).               | Un aviso por cátedra y fecha. No tiene motivo y no se cancela.  |
+| **Ausencia**    | Aviso de que el docente no dará una clase (cátedra + fecha), a nombre del docente que lo dio. | Un aviso por cátedra y fecha. No tiene motivo y no se cancela.  |
 
 Una **clase** (ej. "Programación II · 1K1 · martes 03/11 · 18:00-20:00") no es una tabla: se calcula a partir de la cátedra (`dia_semana`, `hora_inicio`, `hora_fin`) y una fecha.
 
@@ -931,8 +933,8 @@ Salvo `/health` y `/auth/login`, **todas las rutas piden un token**. En `/docs`:
 | Método | Ruta                                   | Qué hace | Respuestas |
 |--------|----------------------------------------|----------|------------|
 | GET    | `/api/v1/docente/clases-disponibles`   | Próximas clases del docente sobre las que puede avisar. | `200` · `403` no es docente |
-| POST   | `/api/v1/docente/avisos`               | Registra un aviso con `{catedra_id, fecha}`. Queda en estado `activo`. Devuelve el `AvisoDetalle`. | `201` · `404` cátedra inexistente o ajena · `409` ya hay aviso · `422` no cumple las reglas |
-| GET    | `/api/v1/docente/avisos`               | Historial de avisos del docente (pasados y futuros), por fecha descendente. Paginado con `?offset=&limit=`. | `200` · `403` no es docente |
+| POST   | `/api/v1/docente/avisos`               | Registra un aviso con `{catedra_id, fecha}`, a nombre del docente logueado. Queda en estado `activo`. Devuelve el `AvisoDetalle`. | `201` · `404` cátedra inexistente o ajena · `409` ya hay aviso · `422` no cumple las reglas |
+| GET    | `/api/v1/docente/avisos`               | Avisos que dio el docente (pasados y futuros), por fecha descendente. Siguen siendo suyos aunque la cátedra se reasigne. Paginado con `?offset=&limit=`. | `200` · `403` no es docente |
 
 Una clase aparece en la lista (y el `POST` la acepta) solo si:
 
@@ -980,7 +982,7 @@ Todas piden rol `admin`.
 | `carrera_id`  | Avisos de materias de esa carrera |
 | `materia_id`  | Avisos de esa materia |
 | `comision`    | Texto exacto, **sin distinguir mayúsculas** (`1k1` = `1K1`). Solo, trae esa comisión en todas las materias |
-| `docente_id`  | Avisos de ese docente |
+| `docente_id`  | Avisos que dio ese docente (aunque la cátedra se haya reasignado después) |
 | `fecha_desde` / `fecha_hasta` | Rango de fechas, **incluyendo los extremos** (`AAAA-MM-DD`) |
 
 Respuestas: `200` · `403` no es admin · `422` si `fecha_desde` es posterior a `fecha_hasta`. Un id que no existe devuelve una lista vacía (es un filtro, no un 404).

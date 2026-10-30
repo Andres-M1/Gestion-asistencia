@@ -47,7 +47,7 @@ def escenario(session, datos):
     )
 
     def aviso(catedra, fecha):
-        return _guardar(session, Ausencia(catedra_id=catedra.id, fecha=fecha))[0]
+        return _guardar(session, Ausencia(catedra_id=catedra.id, docente_id=catedra.docente_id, fecha=fecha))[0]
 
     return {
         "alumno": alumno,

@@ -2,18 +2,19 @@
 
 Los avisos se crean directo en la base: el POST de HU-02 no permite fechas pasadas.
 """
-from datetime import date, time
+from datetime import date, datetime, time
 
 import pytest
 
 from app.models import Ausencia, Catedra
+from app.services import ausencias
 from tests.conftest import auth
 
 AVISOS = "/api/v1/docente/avisos"
 
 
 def _aviso(session, catedra, fecha):
-    aviso = Ausencia(catedra_id=catedra.id, fecha=fecha)
+    aviso = Ausencia(catedra_id=catedra.id, docente_id=catedra.docente_id, fecha=fecha)
     session.add(aviso)
     session.commit()
     return aviso
@@ -81,3 +82,27 @@ def test_solo_docentes_con_perfil(client, datos, quien):
 
 def test_sin_token_responde_401(client):
     assert client.get(AVISOS).status_code == 401
+
+
+def test_al_reasignar_la_catedra_los_avisos_anteriores_siguen_siendo_de_quien_los_dio(
+    client, datos, avisos, fijar_ahora
+):
+    """lunes_a (docente A) pasa al docente B: los avisos que dio A siguen en su historial
+    y a su nombre; B no los ve, y los avisos que B dé desde ahora son de B."""
+    r = client.patch(f"/api/v1/catedras/{datos['lunes_a'].id}", headers=auth(datos["u_admin"]),
+                     json={"docente_id": datos["doc_b"].id})
+    assert r.status_code == 200, r.text
+
+    fijar_ahora(datetime(2026, 11, 10, 10, 0, tzinfo=ausencias.ZONA))
+    r = client.post(AVISOS, headers=auth(datos["u_doc_b"]),
+                    json={"catedra_id": datos["lunes_a"].id, "fecha": "2026-11-16"})
+    assert r.status_code == 201, r.text
+    nuevo_de_b = r.json()["id"]
+
+    de_a = mis_avisos(client, datos["u_doc_a"])
+    assert [a["id"] for a in de_a] == [avisos[k].id for k in ("futuro", "martes_18hs", "martes_8hs", "pasado")]
+    assert {a["docente"]["apellido"] for a in de_a} == {"80000001"}
+
+    de_b = mis_avisos(client, datos["u_doc_b"])
+    assert [a["id"] for a in de_b] == [nuevo_de_b, avisos["de_otro_docente"].id]
+    assert {a["docente"]["apellido"] for a in de_b} == {"80000002"}
